@@ -1,0 +1,19 @@
+[project]
+name = "seeks"
+version = "0.1.0"
+description = "Structured Execution Environment of Knowledge Systems"
+authors = [
+    {name = "Koen van Esterik", email = "koen@vanesterik.dev"},
+]
+dependencies = []
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+
+[tool.pdm]
+distribution = true
