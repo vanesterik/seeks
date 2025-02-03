@@ -2,18 +2,83 @@
 name = "seeks"
 version = "0.1.0"
 description = "Structured Execution Environment of Knowledge Systems"
-authors = [
-    {name = "Koen van Esterik", email = "koen@vanesterik.dev"},
+authors = [{ name = "Koen van Esterik", email = "koen@vanesterik.dev" }]
+dependencies = [
+    "sqlalchemy>=2.0.37",
+    "tabulate>=0.9.0",
+    "inquirer>=3.4.0",
+    "pydantic>=2.10.6",
 ]
-dependencies = []
 requires-python = ">=3.11"
 readme = "README.md"
-license = {text = "MIT"}
+license = { text = "MIT" }
 
-[build-system]
-requires = ["pdm-backend"]
-build-backend = "pdm.backend"
+
+[dependency-groups]
+dev = [
+    "autoflake>=2.3.1",
+    "black>=25.1.0",
+    "isort>=6.0.0",
+    "mypy>=1.14.1",
+    "pytest-watch>=4.2.0",
+    "pytest>=8.3.4",
+    "ruff>=0.9.4",
+    "types-tabulate>=0.9.0.20241207",
+    "watchdog>=6.0.0",
+]
 
 
 [tool.pdm]
 distribution = true
+
+
+[tool.autoflake]
+check = true
+
+
+[tool.isort]
+atomic = true
+case_sensitive = true
+extra_standard_library = ["typing_extensions"]
+include_trailing_comma = true
+line_length = 120
+multi_line_output = 3
+profile = "black"
+py_version = 311
+remove_redundant_aliases = true
+skip_gitignore = true
+
+
+[tool.mypy]
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+ignore_missing_imports = true # Don't like this, but necessary for now because mypy triggers error on imported modules
+namespace_packages = false
+no_implicit_reexport = true
+show_error_codes = true
+show_error_context = true
+strict_equality = true
+strict_optional = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unused_ignores = true
+
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+python_classes = "Test*"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "fast: marks tests as fast",
+]
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)s] %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
