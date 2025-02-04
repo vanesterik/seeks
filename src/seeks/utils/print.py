@@ -8,7 +8,7 @@ def print_table(data: List[Dict[str, Any]]) -> None:
     print(f"{table}\n")
 
 
-def print_message(
+def print_alert(
     message: str,
     type: Union[
         Literal["error"],

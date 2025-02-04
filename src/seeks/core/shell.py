@@ -4,16 +4,16 @@ import os
 import readline
 from typing import Optional
 
-from seeks.common.classes import Component
+from seeks.common.labels import Labels
 from seeks.core.commands import (
     list_assistants,
     list_models,
     list_providers,
     query_assistant_names,
-    query_model_id,
     query_model_names,
     query_provider_id,
     query_provider_names,
+    query_settings,
     register_assistant,
     register_model,
     register_provider,
@@ -30,9 +30,10 @@ from seeks.core.prompts import (
     select_model,
     select_provider,
 )
+from seeks.core.schemas import Component
 from seeks.utils.clear_screen import clear_screen
 from seeks.utils.get_home_dir import get_home_dir
-from seeks.utils.print import print_message, print_table
+from seeks.utils.print import print_alert, print_table
 
 
 class Shell(cmd.Cmd):
@@ -84,22 +85,57 @@ class Shell(cmd.Cmd):
             ]
             print_table(table)
 
+    def do_list(self, _: str) -> None:
+        """List component entries from database"""
+
+        selection = select_component()
+        clear_screen()
+
+        if selection.component == Component.PROVIDER:
+            providers = list_providers()
+            (
+                print_table(providers)
+                if providers
+                else print_alert(Labels.NO_PROVIDERS, type="warning")
+            )
+
+        if selection.component == Component.MODEL:
+            models = list_models()
+            (
+                print_table(models)
+                if models
+                else print_alert(Labels.NO_MODELS, type="warning")
+            )
+
+        if selection.component == Component.ASSISTANT:
+            assistants = list_assistants()
+            (
+                print_table(assistants)
+                if assistants
+                else print_alert(Labels.NO_ASSISTANTS, type="warning")
+            )
+
     def do_register(self, _: str) -> None:
         """Register component to database"""
 
         selection = select_component()
+        clear_screen()
 
         if selection.component == Component.PROVIDER:
             provider = get_provider_details()
-            register_provider(provider.name, provider.api_key)
+            try:
+                register_provider(provider.name, provider.api_key)
+                print_alert(Labels.PROVIDER_REGISTERED, type="success")
+            except ValueError as error:
+                print_alert(str(error), type="error")
 
         if selection.component == Component.MODEL:
             provider_names = query_provider_names()
 
             if not provider_names:
                 clear_screen()
-                print_message(
-                    "No providers found. Please register a provider first",
+                print_alert(
+                    f"{Labels.NO_PROVIDERS} {Labels.PLEASE_REGISTER}",
                     type="warning",
                 )
                 return
@@ -107,36 +143,25 @@ class Shell(cmd.Cmd):
             provider = select_provider(provider_names)
             provider_id = query_provider_id(provider.name)
             model = get_model_details(provider_id)
-            register_model(model.name, model.provider_id)
+            try:
+                register_model(model.name, model.provider_id)
+                print_alert(Labels.MODEL_REGISTERED, type="success")
+            except ValueError as error:
+                print_alert(str(error), type="error")
 
         if selection.component == Component.ASSISTANT:
-            model_names = query_model_names()
-
-            if not model_names:
-                clear_screen()
-                print_message(
-                    "No models found. Please register a model first",
-                    type="warning",
-                )
-                return
-
-            model = select_model(model_names)
-            model_id = query_model_id(model.name)
-            assistant = get_assistant_details(model_id)
-            register_assistant(
-                assistant.name, assistant.description, assistant.model_id
-            )
-
-        clear_screen()
-        print_message(
-            f"{selection.component.value} registered",
-            type="success",
-        )
+            assistant = get_assistant_details()
+            try:
+                register_assistant(assistant.name, assistant.description)
+                print_alert(Labels.ASSISTANT_REGISTERED, type="success")
+            except ValueError as error:
+                print_alert(str(error), type="error")
 
     def do_unregister(self, _: str) -> None:
         """Unregister component from database"""
 
         selection = select_component()
+        clear_screen()
 
         if selection.component == Component.PROVIDER:
             provider_names = query_provider_names()
@@ -153,42 +178,17 @@ class Shell(cmd.Cmd):
             assistant = select_assistant(assistant_names)
             unregister_assistant(assistant.name)
 
-        clear_screen()
-        print_message(
-            f"{selection.component.value} unregistered",
+        print_alert(
+            f"{selection.component.value} {Labels.REGISTERED}",
             type="success",
         )
 
-    def do_list(self, _: str) -> None:
-        """List component entries from database"""
-
-        selection = select_component()
+    def do_settings(self, _: str) -> None:
+        """Show settings"""
 
         clear_screen()
-
-        if selection.component == Component.PROVIDER:
-            providers = list_providers()
-            (
-                print_table(providers)
-                if providers
-                else print_message("No providers found", type="warning")
-            )
-
-        if selection.component == Component.MODEL:
-            models = list_models()
-            (
-                print_table(models)
-                if models
-                else print_message("No models found", type="warning")
-            )
-
-        if selection.component == Component.ASSISTANT:
-            assistants = list_assistants()
-            (
-                print_table(assistants)
-                if assistants
-                else print_message("No assistants found", type="warning")
-            )
+        settings = query_settings()
+        print_table(settings)
 
     def do_quit(self, _: str) -> bool:
         """Quit the program"""

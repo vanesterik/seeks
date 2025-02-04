@@ -4,7 +4,7 @@ from inquirer import List as ListPrompt
 from inquirer import Text as TextPrompt
 from inquirer import prompt
 
-from seeks.common.classes import (
+from seeks.core.schemas import (
     AssistantDetails,
     Component,
     ComponentSelection,
@@ -97,7 +97,7 @@ def select_model(models: List[str]) -> ModelSelection:
 # ==============================================================================
 
 
-def get_assistant_details(model_id: int) -> AssistantDetails:
+def get_assistant_details() -> AssistantDetails:
     questions = [
         TextPrompt(
             name="name",
@@ -110,10 +110,7 @@ def get_assistant_details(model_id: int) -> AssistantDetails:
             validate=required,
         ),
     ]
-    return AssistantDetails(
-        **prompt(questions),
-        model_id=model_id,
-    )
+    return AssistantDetails(**prompt(questions))
 
 
 def select_assistant(assistants: List[str]) -> AssistantDetails:
