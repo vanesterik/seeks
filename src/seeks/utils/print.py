@@ -9,7 +9,7 @@ from seeks.utils.clear_screen import clear_screen
 def print_table(
     data: Union[
         List[schemas.ProviderResponse],
-        List[schemas.AgentResponse],
+        List[schemas.AssistantResponse],
         List[schemas.ThreadResponse],
     ],
     clear: bool = True,

@@ -26,21 +26,21 @@ class Provider(Base):
         )
 
 
-class Agent(Base):
-    __tablename__ = "agent"
+class Assistant(Base):
+    __tablename__ = "assistant"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(30), unique=True)
     description: Mapped[str]
     model: Mapped[str]
     threads: Mapped[List["Thread"]] = relationship(
-        back_populates="agent",
+        back_populates="assistant",
         cascade="all, delete-orphan",
     )
-    settings = relationship("Settings", back_populates="agent")
+    settings = relationship("Settings", back_populates="assistant")
 
     def __repr__(self) -> str:
-        return "<Agent(id={}, name={}, model={}, description={})>".format(
+        return "<Assistant(id={}, name={}, model={}, description={})>".format(
             self.id,
             self.name,
             self.model,
@@ -53,8 +53,8 @@ class Thread(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(30))
-    agent: Mapped["Agent"] = relationship(back_populates="threads")
-    agent_id: Mapped[int] = mapped_column(ForeignKey("agent.id"))
+    assistant: Mapped["Assistant"] = relationship(back_populates="threads")
+    assistant_id: Mapped[int] = mapped_column(ForeignKey("assistant.id"))
     messages: Mapped[List["Message"]] = relationship(
         back_populates="thread",
         cascade="all, delete-orphan",
@@ -97,9 +97,9 @@ class Settings(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     instance_id = Column(Integer, unique=True, default=1)
-    agent = relationship("Agent", back_populates="settings")
-    agent_id: Mapped[int] = mapped_column(
-        ForeignKey("agent.id"),
+    assistant = relationship("Assistant", back_populates="settings")
+    assistant_id: Mapped[int] = mapped_column(
+        ForeignKey("assistant.id"),
         nullable=True,
     )
     thread = relationship("Thread", back_populates="settings")
@@ -109,8 +109,8 @@ class Settings(Base):
     )
 
     def __repr__(self) -> str:
-        return "<Settings(id={}, agent_id={}, thread_id={})>".format(
+        return "<Settings(id={}, assistant_id={}, thread_id={})>".format(
             self.id,
-            self.agent_id,
+            self.assistant_id,
             self.thread_id,
         )

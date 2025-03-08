@@ -107,7 +107,7 @@ class Shell(cmd.Cmd):
         Shell command to list component items from database:
 
         - providers
-        - agents
+        - assistants
         - threads
 
         """
@@ -138,17 +138,17 @@ class Shell(cmd.Cmd):
             ]
             print_table(providers)
 
-        if component.component == schemas.Component.AGENT:
-            agents = [
-                schemas.AgentResponse(
-                    id=agent.id,
-                    name=agent.name,
-                    model=agent.model,
-                    description=ellipse(agent.description),
+        if component.component == schemas.Component.ASSISTANT:
+            assistants = [
+                schemas.AssistantResponse(
+                    id=assistant.id,
+                    name=assistant.name,
+                    model=assistant.model,
+                    description=ellipse(assistant.description),
                 )
-                for agent in component_items
+                for assistant in component_items
             ]
-            print_table(agents)
+            print_table(assistants)
 
         if component.component == schemas.Component.THREAD:
             print_table(component_items)
@@ -158,7 +158,7 @@ class Shell(cmd.Cmd):
         Shell command to create component entry in database:
 
         - provider
-        - agent
+        - assistant
 
         Remarks
         -------
@@ -190,19 +190,19 @@ class Shell(cmd.Cmd):
             except ValueError as error:
                 print_alert(str(error), type="error")
 
-        if component.component == schemas.Component.AGENT:
-            agent = self._prompts.create_agent()
+        if component.component == schemas.Component.ASSISTANT:
+            assistant = self._prompts.create_assistant()
 
-            if agent is None:
-                print_alert("Agent creation cancelled", type="warning")
+            if assistant is None:
+                print_alert("Assistant creation cancelled", type="warning")
                 return None
 
             try:
                 self._commands.create_component_item(
                     component=component.component,
-                    component_item=agent,
+                    component_item=assistant,
                 )
-                print_alert("Agent created", type="success")
+                print_alert("Assistant created", type="success")
 
             except ValueError as error:
                 print_alert(str(error), type="error")
@@ -212,7 +212,7 @@ class Shell(cmd.Cmd):
         Shell command to update component entry in database:
 
         - provider
-        - agent
+        - Assistant
 
         Remarks
         -------
@@ -268,29 +268,29 @@ class Shell(cmd.Cmd):
             )
             print_alert("Provider updated", type="success")
 
-        if component.component == schemas.Component.AGENT:
-            agent = self._commands.read_component_item(
+        if component.component == schemas.Component.ASSISTANT:
+            assistant = self._commands.read_component_item(
                 component=component.component,
                 component_item_id=component_item.id,
             )
-            agent = self._prompts.update_agent(agent)
+            assistant = self._prompts.update_assistant(assistant)
 
-            if agent is None:
-                print_alert("Agent update cancelled", type="warning")
+            if assistant is None:
+                print_alert("Assistant update cancelled", type="warning")
                 return None
 
             self._commands.update_component_item(
                 component=component.component,
-                component_item=agent,
+                component_item=assistant,
             )
-            print_alert("Agent updated", type="success")
+            print_alert("Assistant updated", type="success")
 
     def do_delete(self, _: str) -> None:
         """
         Shell command to delete component item from database:
 
         - provider
-        - agent
+        - assistant
         - thread
 
         """

@@ -12,7 +12,7 @@ class Commands:
 
     def list_component(self, component: schemas.Component) -> Union[
         List[schemas.ProviderResponse],
-        List[schemas.AgentResponse],
+        List[schemas.AssistantResponse],
         List[schemas.ThreadResponse],
     ]:
         """
@@ -26,7 +26,7 @@ class Commands:
         -------
         - Union[
             List[schemas.ProviderResponse],
-            List[schemas.AgentResponse],
+            List[schemas.AssistantResponse],
             List[schemas.ThreadResponse],
           ]: List of components.
 
@@ -39,9 +39,12 @@ class Commands:
                 for provider in providers
             ]
 
-        if component == schemas.Component.AGENT:
-            agents = self._session.query(models.Agent).all()
-            return [schemas.AgentResponse.model_validate(agent) for agent in agents]
+        if component == schemas.Component.ASSISTANT:
+            assistants = self._session.query(models.Assistant).all()
+            return [
+                schemas.AssistantResponse.model_validate(assistant)
+                for assistant in assistants
+            ]
 
         if component == schemas.Component.THREAD:
             threads = self._session.query(models.Thread).all()
@@ -54,18 +57,18 @@ class Commands:
         component: schemas.Component,
         component_item: Union[
             schemas.ProviderCreate,
-            schemas.AgentCreate,
+            schemas.AssistantCreate,
         ],
     ) -> None:
         """
-        Create component item. Only providers and agents are supported, because
-        threads are created by default user input.
+        Create component item. Only providers and assistants are supported,
+        because threads are created by default user input.
 
         Params
         ------
         - component (schemas.Component): Component to create an item for.
         - component_item (Union[
-            schemas.ProviderCreate, schemas.AgentCreate,
+            schemas.ProviderCreate, schemas.AssistantCreate,
           ]): Data to create component.
 
         """
@@ -79,20 +82,20 @@ class Commands:
                 self._session.rollback()
                 raise ValueError("Provider already exists")
 
-        if component == schemas.Component.AGENT:
-            agent = models.Agent(**component_item.model_dump())
-            self._session.add(agent)
+        if component == schemas.Component.ASSISTANT:
+            assistant = models.Assistant(**component_item.model_dump())
+            self._session.add(assistant)
             try:
                 self._session.commit()
             except IntegrityError:
                 self._session.rollback()
-                raise ValueError("Agent already exists")
+                raise ValueError("Assistant already exists")
 
     def read_component_item(
         self, component: schemas.Component, component_item_id: int
     ) -> Union[
         schemas.ProviderResponse,
-        schemas.AgentResponse,
+        schemas.AssistantResponse,
         schemas.ThreadResponse,
     ]:
         """
@@ -107,7 +110,7 @@ class Commands:
         -------
         - Union[
             schemas.ProviderResponse,
-            schemas.AgentResponse,
+            schemas.AssistantResponse,
             schemas.ThreadResponse,
           ]: Component item.
 
@@ -117,9 +120,9 @@ class Commands:
             provider = self._session.query(models.Provider).get(component_item_id)
             response = schemas.ProviderResponse.model_validate(provider)
 
-        if component == schemas.Component.AGENT:
-            agent = self._session.query(models.Agent).get(component_item_id)
-            response = schemas.AgentResponse.model_validate(agent)
+        if component == schemas.Component.ASSISTANT:
+            assistant = self._session.query(models.Assistant).get(component_item_id)
+            response = schemas.AssistantResponse.model_validate(assistant)
 
         if component == schemas.Component.THREAD:
             thread = self._session.query(models.Thread).get(component_item_id)
@@ -143,7 +146,7 @@ class Commands:
         - component (schemas.Component): Component to update.
         - id (int): Component item id.
         - component_item (Union[
-            schemas.ProviderUpdate, schemas.AgentUpdate,
+            schemas.ProviderUpdate, schemas.AssistantUpdate,
           ]): Data to update component.
 
         """
@@ -153,11 +156,11 @@ class Commands:
             provider.api_key = component_item.api_key
             self._session.commit()
 
-        if component == schemas.Component.AGENT:
-            agent = self._session.query(models.Agent).get(component_item.id)
-            agent.name = component_item.name
-            agent.description = component_item.description
-            agent.model = component_item.model
+        if component == schemas.Component.ASSISTANT:
+            assistant = self._session.query(models.Assistant).get(component_item.id)
+            assistant.name = component_item.name
+            assistant.description = component_item.description
+            assistant.model = component_item.model
             self._session.commit()
 
     def delete_component_item(
@@ -178,9 +181,9 @@ class Commands:
             self._session.delete(provider)
             self._session.commit()
 
-        if component == schemas.Component.AGENT:
-            agent = self._session.query(models.Agent).get(component_item_id)
-            self._session.delete(agent)
+        if component == schemas.Component.ASSISTANT:
+            assistant = self._session.query(models.Assistant).get(component_item_id)
+            self._session.delete(assistant)
             self._session.commit()
 
         if component == schemas.Component.THREAD:

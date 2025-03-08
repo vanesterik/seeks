@@ -14,7 +14,11 @@ class Prompts:
         self, exclude: Optional[List[schemas.Component]] = None
     ) -> Union[schemas.ComponentSelect, None]:
         """
-        Prompt to select a component: - provider - agent - thread
+        Prompt to select a component:
+
+        - provider
+        - assistant
+        - thread
 
         Params
         ------
@@ -48,7 +52,7 @@ class Prompts:
         component: schemas.Component,
         component_items: Union[
             List[schemas.ProviderResponse],
-            List[schemas.AgentResponse],
+            List[schemas.AssistantResponse],
             List[schemas.ThreadResponse],
         ],
     ) -> Union[schemas.ComponentItemSelect, None]:
@@ -60,7 +64,7 @@ class Prompts:
         - component (schemas.Component): Component to select item from.
         - component_items (Union[
             List[schemas.ProviderResponse],
-            List[schemas.AgentResponse],
+            List[schemas.AssistantResponse],
             List[schemas.ThreadResponse],
           ]): List of component items.
 
@@ -81,15 +85,15 @@ class Prompts:
             ]
             message = "Select provider"
 
-        if component == schemas.Component.AGENT:
+        if component == schemas.Component.ASSISTANT:
             choices = [
                 Choice(
-                    title=agent.name,
-                    value=agent.id,
+                    title=assistant.name,
+                    value=assistant.id,
                 )
-                for agent in component_items
+                for assistant in component_items
             ]
-            message = "Select agent"
+            message = "Select Assistant"
 
         if component == schemas.Component.THREAD:
             choices = [
@@ -155,14 +159,14 @@ class Prompts:
 
         return schemas.ProviderCreate(**result)
 
-    def create_agent(self) -> Union[schemas.AgentCreate, None]:
+    def create_assistant(self) -> Union[schemas.AssistantCreate, None]:
         """
-        Prompt to create agent.
+        Prompt to create assistant.
 
         Returns
         -------
-        - Union[schemas.AgentCreate, None]: Agent name, model and description or
-          None in case user cancels.
+        - Union[schemas.AssistantCreate, None]: Assistant name, model and
+          description or None in case user cancels.
 
         """
 
@@ -170,7 +174,7 @@ class Prompts:
             {
                 "type": "text",
                 "name": "name",
-                "message": "Agent name",
+                "message": "Assistant name",
                 "validate": required,
             },
             {
@@ -191,7 +195,7 @@ class Prompts:
         if not result:
             return None
 
-        return schemas.AgentCreate(**result)
+        return schemas.AssistantCreate(**result)
 
     def update_provider(
         self, provider: schemas.ProviderResponse
@@ -222,16 +226,16 @@ class Prompts:
 
         return schemas.ProviderResponse(**{**provider_data, **result})
 
-    def update_agent(
-        self, agent: schemas.AgentResponse
-    ) -> Union[schemas.AgentResponse, None]:
+    def update_assistant(
+        self, assistant: schemas.AssistantResponse
+    ) -> Union[schemas.AssistantResponse, None]:
         """
-        Prompt to update agent.
+        Prompt to update assistant.
 
         Returns
         -------
-        - Union[schemas.AgentResponse, None]: Agent name, model and description
-          or None in case user cancels.
+        - Union[schemas.AssistantResponse, None]: Assistant name, model and
+          description or None in case user cancels.
 
         """
 
@@ -239,32 +243,32 @@ class Prompts:
             {
                 "type": "text",
                 "name": "name",
-                "message": "Agent name",
+                "message": "Assistant name",
                 "validate": required,
-                "default": agent.name,
+                "default": assistant.name,
             },
             {
                 "type": "select",
                 "name": "model",
                 "message": "Model",
                 "choices": self._config.list_models(),
-                "default": agent.model,
+                "default": assistant.model,
             },
             {
                 "type": "text",
                 "name": "description",
                 "message": "Description",
                 "validate": required,
-                "default": agent.description,
+                "default": assistant.description,
             },
         ]
-        agent_data = agent.model_dump()
+        assistant_data = assistant.model_dump()
         result = prompt(questions)
 
         if not result:
             return None
 
-        return schemas.AgentResponse(**{**agent_data, **result})
+        return schemas.AssistantResponse(**{**assistant_data, **result})
 
 
 def required(value: str) -> bool:

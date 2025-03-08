@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 class Component(Enum):
     PROVIDER = "provider"
-    AGENT = "agent"
+    ASSISTANT = "assistant"
     THREAD = "thread"
 
     @classmethod
@@ -42,17 +42,17 @@ class ProviderResponse(BaseModel):
         from_attributes = True
 
 
-class AgentBase(BaseModel):
+class AssistantBase(BaseModel):
     name: str
     model: str
     description: str
 
 
-class AgentCreate(AgentBase):
+class AssistantCreate(AssistantBase):
     pass
 
 
-class AgentResponse(BaseModel):
+class AssistantResponse(BaseModel):
     id: int
     name: str
     model: str
@@ -64,7 +64,7 @@ class AgentResponse(BaseModel):
 
 class ThreadBase(BaseModel):
     name: str
-    agent_id: int
+    assistant_id: int
     description: str
 
 
@@ -75,7 +75,7 @@ class ThreadCreate(ThreadBase):
 class ThreadResponse(BaseModel):
     id: int
     name: str
-    agent_id: int
+    assistant_id: int
     description: str
 
     class Config:
