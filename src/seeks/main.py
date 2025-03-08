@@ -1,37 +1,32 @@
 from seeks.common.config import Config
-from seeks.common.labels import Labels
-from seeks.core.commands import initialize_database
+from seeks.core.commands import Commands
+from seeks.core.database import engine, get_session
+from seeks.core.models import Base
+from seeks.core.prompts import Prompts
 from seeks.core.shell import Shell
-from seeks.utils.clear_screen import clear_screen
-from seeks.utils.get_project_version import get_project_version
+
+# from seeks.utils.clear_screen import clear_screen
 
 
 def main() -> None:
-    # Initialize database with tables and default data
-    initialize_database()
+    # clear_screen()
 
-    # Clear screen to make room for shell intro and prompt
-    clear_screen()
+    # Initialize database and tables
+    # Base.metadata.drop_all(engine)  # Only for developing/testing purposes
+    Base.metadata.create_all(bind=engine)
+
+    config = Config()
+    session = next(get_session())
+    commands = Commands(session=session)
+    prompts = Prompts(config=config)
 
     # Create and run REPL instance
-    shell = Shell()
-    shell.intro = (
-        "\n".join(
-            [
-                f"{Labels.TITLE} {get_project_version()}",
-                Labels.INTRO,
-            ]
-        )
-        + "\n"
+    shell = Shell(
+        commands=commands,
+        config=config,
+        prompts=prompts,
     )
-    shell.prompt = f"{Config.PROMPT} "
-
-    # Run shell instance and handle KeyboardInterrupt exception to exit shell
-    # session gracefully
-    try:
-        shell.cmdloop()
-    except KeyboardInterrupt:
-        print(Labels.EXITING)
+    shell.run()
 
 
 if __name__ == "__main__":

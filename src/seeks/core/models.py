@@ -4,9 +4,11 @@ from typing import List
 from sqlalchemy import Column
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from seeks.core.database import Base
+
+class Base(DeclarativeBase):
+    pass
 
 
 class Provider(Base):
@@ -15,43 +17,35 @@ class Provider(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(30), unique=True)
     api_key: Mapped[str]
-    models: Mapped[List["Model"]] = relationship(
-        back_populates="provider",
-        cascade="all, delete-orphan",
-    )
-    settings = relationship("Settings", back_populates="provider")
 
     def __repr__(self) -> str:
-        return f"<Provider(id={self.id}, name='{self.name}')>"
+        return "<Provider(id={}, name={}, api_key={})>".format(
+            self.id,
+            self.name,
+            self.api_key,
+        )
 
 
-class Model(Base):
-    __tablename__ = "model"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(30), unique=True)
-    provider: Mapped["Provider"] = relationship(back_populates="models")
-    provider_id: Mapped[int] = mapped_column(ForeignKey("provider.id"))
-    settings = relationship("Settings", back_populates="model")
-
-    def __repr__(self) -> str:
-        return f"<Model(id={self.id}, name='{self.name}')>"
-
-
-class Assistant(Base):
-    __tablename__ = "assistant"
+class Agent(Base):
+    __tablename__ = "agent"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(30), unique=True)
     description: Mapped[str]
+    model: Mapped[str]
     threads: Mapped[List["Thread"]] = relationship(
-        back_populates="assistant",
+        back_populates="agent",
         cascade="all, delete-orphan",
     )
-    settings = relationship("Settings", back_populates="assistant")
+    settings = relationship("Settings", back_populates="agent")
 
     def __repr__(self) -> str:
-        return f"<Assistant(id={self.id}, name='{self.name}')>"
+        return "<Agent(id={}, name={}, model={}, description={})>".format(
+            self.id,
+            self.name,
+            self.model,
+            self.description,
+        )
 
 
 class Thread(Base):
@@ -59,8 +53,8 @@ class Thread(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(30))
-    assistant: Mapped["Assistant"] = relationship(back_populates="threads")
-    assistant_id: Mapped[int] = mapped_column(ForeignKey("assistant.id"))
+    agent: Mapped["Agent"] = relationship(back_populates="threads")
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agent.id"))
     messages: Mapped[List["Message"]] = relationship(
         back_populates="thread",
         cascade="all, delete-orphan",
@@ -68,7 +62,10 @@ class Thread(Base):
     settings = relationship("Settings", back_populates="thread")
 
     def __repr__(self) -> str:
-        return f"<Thread(id={self.id}, name='{self.name}')>"
+        return "<Thread(id={}, name={})>".format(
+            self.id,
+            self.name,
+        )
 
 
 class RoleType(str, Enum):
@@ -82,12 +79,16 @@ class Message(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     role: Mapped[RoleType] = mapped_column(SQLAlchemyEnum(RoleType))
-    text: Mapped[str]
+    content: Mapped[str]
     thread: Mapped["Thread"] = relationship(back_populates="messages")
     thread_id: Mapped[int] = mapped_column(ForeignKey("thread.id"))
 
     def __repr__(self) -> str:
-        return f"<Message(id={self.id}, role='{self.role}', text='{self.text}')>"
+        return "<Message(id={}, role={}, text={})>".format(
+            self.id,
+            self.role,
+            self.content,
+        )
 
 
 class Settings(Base):
@@ -96,19 +97,9 @@ class Settings(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     instance_id = Column(Integer, unique=True, default=1)
-    provider = relationship("Provider", back_populates="settings")
-    provider_id: Mapped[int] = mapped_column(
-        ForeignKey("provider.id"),
-        nullable=True,
-    )
-    model = relationship("Model", back_populates="settings")
-    model_id: Mapped[int] = mapped_column(
-        ForeignKey("model.id"),
-        nullable=True,
-    )
-    assistant = relationship("Assistant", back_populates="settings")
-    assistant_id: Mapped[int] = mapped_column(
-        ForeignKey("assistant.id"),
+    agent = relationship("Agent", back_populates="settings")
+    agent_id: Mapped[int] = mapped_column(
+        ForeignKey("agent.id"),
         nullable=True,
     )
     thread = relationship("Thread", back_populates="settings")
@@ -118,4 +109,8 @@ class Settings(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Settings(id={self.id}, provider_id={self.provider_id}, model_id={self.model_id}, assistant_id={self.assistant_id}, thread_id={self.thread_id})>"
+        return "<Settings(id={}, agent_id={}, thread_id={})>".format(
+            self.id,
+            self.agent_id,
+            self.thread_id,
+        )

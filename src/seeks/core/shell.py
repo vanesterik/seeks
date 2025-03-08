@@ -2,205 +2,82 @@ import atexit
 import cmd
 import os
 import readline
-from typing import Optional
 
-from seeks.common.labels import Labels
-from seeks.core.commands import (
-    list_assistants,
-    list_models,
-    list_providers,
-    query_assistant_names,
-    query_model_names,
-    query_provider_id,
-    query_provider_names,
-    query_settings,
-    register_assistant,
-    register_model,
-    register_provider,
-    unregister_assistant,
-    unregister_model,
-    unregister_provider,
-)
-from seeks.core.prompts import (
-    get_assistant_details,
-    get_model_details,
-    get_provider_details,
-    select_assistant,
-    select_component,
-    select_model,
-    select_provider,
-)
-from seeks.core.schemas import Component
+from seeks.common.config import Config
+from seeks.core import schemas
+from seeks.core.commands import Commands
+from seeks.core.prompts import Prompts
 from seeks.utils.clear_screen import clear_screen
+from seeks.utils.ellipse import ellipse
 from seeks.utils.get_home_dir import get_home_dir
+from seeks.utils.get_project_version import get_project_version
+from seeks.utils.mask_api_key import mask_api_key
 from seeks.utils.print import print_alert, print_table
 
 
 class Shell(cmd.Cmd):
     def __init__(
         self,
-        history_file: Optional[str] = os.path.expanduser(get_home_dir() / "history"),
+        commands: Commands,
+        config: Config,
+        prompts: Prompts,
     ) -> None:
         super().__init__()
-        self.history_file = history_file
-        self.init_history()
 
-    def init_history(self) -> None:
+        self._commands = commands
+        self._config = config
+        self._history_file = os.path.expanduser(get_home_dir() / "history")
+        self._prompts = prompts
+        self._init_history()
+
+        self.intro = (
+            "\n".join(
+                [
+                    f"SEEKS {get_project_version()}",
+                    "Type 'help' or '?' for more information.",
+                ]
+            )
+            + "\n"
+        )
+        self.prompt = ">>> "
+
+    def _init_history(self) -> None:
         """
         Initialize history file and set history length to 1000 lines to store
         more commands in history file.
+
         """
         readline.set_history_length(1000)
+
         try:
-            readline.read_history_file(self.history_file)
+            readline.read_history_file(self._history_file)
         except FileNotFoundError:
             pass
-        atexit.register(self.save_history)
 
-    def save_history(self) -> None:
+        atexit.register(self._save_history)
+
+    def _save_history(self) -> None:
         """
         Save history file when exiting the shell session.
+
         """
-        readline.write_history_file(self.history_file)
+        readline.write_history_file(self._history_file)
 
-    def do_help(self, arg: str) -> None:
-        """List available commands"""
+    def run(self) -> None:
+        """
+        Run shell instance and handle KeyboardInterrupt exception to exit shell
+        session gracefully.
 
-        if arg:
-            super().do_help(arg)
-        else:
-            table = [
-                {
-                    "command": command,
-                    "description": getattr(self, f"do_{command}").__doc__,
-                }
-                for command in [
-                    "help",
-                    "register",
-                    "unregister",
-                    "list",
-                    "quit",
-                    "exit",
-                ]
-            ]
-            print_table(table)
-
-    def do_list(self, _: str) -> None:
-        """List component entries from database"""
-
-        selection = select_component()
-        clear_screen()
-
-        if selection.component == Component.PROVIDER:
-            providers = list_providers()
-            (
-                print_table(providers)
-                if providers
-                else print_alert(Labels.NO_PROVIDERS, type="warning")
-            )
-
-        if selection.component == Component.MODEL:
-            models = list_models()
-            (
-                print_table(models)
-                if models
-                else print_alert(Labels.NO_MODELS, type="warning")
-            )
-
-        if selection.component == Component.ASSISTANT:
-            assistants = list_assistants()
-            (
-                print_table(assistants)
-                if assistants
-                else print_alert(Labels.NO_ASSISTANTS, type="warning")
-            )
-
-    def do_register(self, _: str) -> None:
-        """Register component to database"""
-
-        selection = select_component()
-        clear_screen()
-
-        if selection.component == Component.PROVIDER:
-            provider = get_provider_details()
-            try:
-                register_provider(provider.name, provider.api_key)
-                print_alert(Labels.PROVIDER_REGISTERED, type="success")
-            except ValueError as error:
-                print_alert(str(error), type="error")
-
-        if selection.component == Component.MODEL:
-            provider_names = query_provider_names()
-
-            if not provider_names:
-                clear_screen()
-                print_alert(
-                    f"{Labels.NO_PROVIDERS} {Labels.PLEASE_REGISTER}",
-                    type="warning",
-                )
-                return
-
-            provider = select_provider(provider_names)
-            provider_id = query_provider_id(provider.name)
-            model = get_model_details(provider_id)
-            try:
-                register_model(model.name, model.provider_id)
-                print_alert(Labels.MODEL_REGISTERED, type="success")
-            except ValueError as error:
-                print_alert(str(error), type="error")
-
-        if selection.component == Component.ASSISTANT:
-            assistant = get_assistant_details()
-            try:
-                register_assistant(assistant.name, assistant.description)
-                print_alert(Labels.ASSISTANT_REGISTERED, type="success")
-            except ValueError as error:
-                print_alert(str(error), type="error")
-
-    def do_unregister(self, _: str) -> None:
-        """Unregister component from database"""
-
-        selection = select_component()
-        clear_screen()
-
-        if selection.component == Component.PROVIDER:
-            provider_names = query_provider_names()
-            provider = select_provider(provider_names)
-            unregister_provider(provider.name)
-
-        if selection.component == Component.MODEL:
-            model_names = query_model_names()
-            model = select_model(model_names)
-            unregister_model(model.name)
-
-        if selection.component == Component.ASSISTANT:
-            assistant_names = query_assistant_names()
-            assistant = select_assistant(assistant_names)
-            unregister_assistant(assistant.name)
-
-        print_alert(
-            f"{selection.component.value} {Labels.REGISTERED}",
-            type="success",
-        )
-
-    def do_settings(self, _: str) -> None:
-        """Show settings"""
-
-        clear_screen()
-        settings = query_settings()
-        print_table(settings)
-
-    def do_quit(self, _: str) -> bool:
-        """Quit the program"""
-        return True
-
-    def do_exit(self, _: str) -> bool:
-        """Same as quit"""
-        return True
+        """
+        try:
+            self.cmdloop()
+        except KeyboardInterrupt:
+            print("Exiting...")
 
     def emptyline(self) -> bool:
         """
         Do nothing on empty input line
+
         """
         return False
 
@@ -210,3 +87,246 @@ class Shell(cmd.Cmd):
         selected model and will be processed accordingly.
         """
         print(f"\n{arg}\n")
+
+    def do_quit(self, _: str) -> bool:
+        """
+        Quit the program
+
+        """
+        return True
+
+    def do_exit(self, _: str) -> bool:
+        """
+        Same as quit
+
+        """
+        return True
+
+    def do_list(self, _: str) -> None:
+        """
+        Shell command to list component items from database:
+
+        - providers
+        - agents
+        - threads
+
+        """
+
+        component = self._prompts.select_component()
+
+        if component is None:
+            print_alert("Component selection cancelled", type="warning")
+            return None
+
+        component_items = self._commands.list_component(component.component)
+
+        if not component_items:
+            print_alert(
+                f"No {component.component.value}s registered",
+                type="warning",
+            )
+            return None
+
+        if component.component == schemas.Component.PROVIDER:
+            providers = [
+                schemas.ProviderResponse(
+                    id=provider.id,
+                    name=self._config.find_provider(provider.name).display_name,
+                    api_key=mask_api_key(provider.api_key),
+                )
+                for provider in component_items
+            ]
+            print_table(providers)
+
+        if component.component == schemas.Component.AGENT:
+            agents = [
+                schemas.AgentResponse(
+                    id=agent.id,
+                    name=agent.name,
+                    model=agent.model,
+                    description=ellipse(agent.description),
+                )
+                for agent in component_items
+            ]
+            print_table(agents)
+
+        if component.component == schemas.Component.THREAD:
+            print_table(component_items)
+
+    def do_create(self, _: str) -> None:
+        """
+        Shell command to create component entry in database:
+
+        - provider
+        - agent
+
+        Remarks
+        -------
+        - Threads are excluded as these are created by user input in the default
+          flow of the application.
+
+        """
+
+        component = self._prompts.select_component(exclude=[schemas.Component.THREAD])
+
+        if component is None:
+            print_alert("Component selection cancelled", type="warning")
+            return None
+
+        if component.component == schemas.Component.PROVIDER:
+            provider = self._prompts.create_provider()
+
+            if provider is None:
+                print_alert("Provider creation cancelled", type="warning")
+                return None
+
+            try:
+                self._commands.create_component_item(
+                    component=component.component,
+                    component_item=provider,
+                )
+                print_alert("Provider created", type="success")
+
+            except ValueError as error:
+                print_alert(str(error), type="error")
+
+        if component.component == schemas.Component.AGENT:
+            agent = self._prompts.create_agent()
+
+            if agent is None:
+                print_alert("Agent creation cancelled", type="warning")
+                return None
+
+            try:
+                self._commands.create_component_item(
+                    component=component.component,
+                    component_item=agent,
+                )
+                print_alert("Agent created", type="success")
+
+            except ValueError as error:
+                print_alert(str(error), type="error")
+
+    def do_update(self, _: str) -> None:
+        """
+        Shell command to update component entry in database:
+
+        - provider
+        - agent
+
+        Remarks
+        -------
+
+        - Providers can only be updated by provider name, as the API key is not
+          allowed to be changed.
+        - Threads are excluded as these are created by user input in the default
+          flow of the application.
+
+        """
+
+        component = self._prompts.select_component(exclude=[schemas.Component.THREAD])
+
+        if component is None:
+            print_alert("Component selection cancelled", type="warning")
+            return None
+
+        component_items = self._commands.list_component(component.component)
+
+        if not component_items:
+            print_alert(
+                f"No {component.component.value}s to update",
+                type="warning",
+            )
+            return None
+
+        component_item = self._prompts.select_component_item(
+            component=component.component,
+            component_items=component_items,
+        )
+
+        if component_item is None:
+            print_alert(
+                f"{component.component.value} selection cancelled",
+                type="warning",
+            )
+            return None
+
+        if component.component == schemas.Component.PROVIDER:
+            provider = self._commands.read_component_item(
+                component=component.component,
+                component_item_id=component_item.id,
+            )
+            provider = self._prompts.update_provider(provider)
+
+            if provider is None:
+                print_alert("Provider update cancelled", type="warning")
+                return None
+
+            self._commands.update_component_item(
+                component=component.component,
+                component_item=provider,
+            )
+            print_alert("Provider updated", type="success")
+
+        if component.component == schemas.Component.AGENT:
+            agent = self._commands.read_component_item(
+                component=component.component,
+                component_item_id=component_item.id,
+            )
+            agent = self._prompts.update_agent(agent)
+
+            if agent is None:
+                print_alert("Agent update cancelled", type="warning")
+                return None
+
+            self._commands.update_component_item(
+                component=component.component,
+                component_item=agent,
+            )
+            print_alert("Agent updated", type="success")
+
+    def do_delete(self, _: str) -> None:
+        """
+        Shell command to delete component item from database:
+
+        - provider
+        - agent
+        - thread
+
+        """
+
+        component = self._prompts.select_component()
+
+        if component is None:
+            print_alert("Component selection cancelled", type="warning")
+            return
+
+        component_items = self._commands.list_component(component.component)
+
+        if not component_items:
+            print_alert(
+                f"No {component.component.value}s to delete",
+                type="warning",
+            )
+            return None
+
+        component_item = self._prompts.select_component_item(
+            component=component.component,
+            component_items=component_items,
+        )
+
+        if component_item is None:
+            print_alert(
+                f"{component.component.value} selection cancelled",
+                type="warning",
+            )
+            return None
+
+        self._commands.delete_component_item(
+            component=component.component,
+            component_item_id=component_item.id,
+        )
+        print_alert(
+            f"{component.component.value} deleted",
+            type="success",
+        )

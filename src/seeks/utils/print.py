@@ -1,10 +1,25 @@
-from typing import Any, Dict, List, Literal, Union
+from typing import List, Literal, Union
 
 from tabulate import tabulate
 
+from seeks.core import schemas
+from seeks.utils.clear_screen import clear_screen
 
-def print_table(data: List[Dict[str, Any]]) -> None:
-    table = tabulate(data, headers="keys")
+
+def print_table(
+    data: Union[
+        List[schemas.ProviderResponse],
+        List[schemas.AgentResponse],
+        List[schemas.ThreadResponse],
+    ],
+    clear: bool = True,
+) -> None:
+
+    # Clear screen before printing message
+    if clear:
+        clear_screen()
+
+    table = tabulate([item.model_dump() for item in data], headers="keys")
     print(f"{table}\n")
 
 
@@ -16,6 +31,7 @@ def print_alert(
         Literal["success"],
         Literal["warning"],
     ] = "info",
+    clear: bool = True,
 ) -> None:
     prefix = {
         "error": "\033[91m✖\033[0m",
@@ -31,5 +47,9 @@ def print_alert(
     # Add period at the end of message if it doesn't exist
     if not message.endswith("."):
         message += "."
+
+    # Clear screen before printing message
+    if clear:
+        clear_screen()
 
     print(f"[{prefix[type]}] {message}\n")

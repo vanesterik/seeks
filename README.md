@@ -76,15 +76,10 @@ erDiagram
         string api_key
     }
 
-    MODEL {
-        int id PK
-        string name
-        int provider_id FK
-    }
-
     ASSISTANT ||--o{ THREAD : manages
     ASSISTANT {
         int id PK
+        string model
         string name
         string description
     }
@@ -99,9 +94,9 @@ erDiagram
 
     MESSAGE {
         int id PK
-        string text
-        enum Role
         int thread_id FK
+        enum role
+        string content
     }
 ```
 
@@ -109,6 +104,12 @@ Always good to visualize the design of the system. :sunglasses:
 
 ## Development
 
+- [ ] Replace `inqurier` with `questionary`
+- [ ] Implement `Config` class to manage configuration
+  - [ ] Implement static `Provider` class
+  - [ ] Implement static `Model` class
+- [ ] Remove `Model` table in database
+- [ ] Add `Model` field to `Assistant` table
 - [ ] Implement template function in Labels class
 - [ ] Implement logger of system that saves in .seeks/logs
 

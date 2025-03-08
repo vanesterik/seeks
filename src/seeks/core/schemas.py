@@ -1,61 +1,82 @@
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
 
 class Component(Enum):
     PROVIDER = "provider"
-    MODEL = "model"
-    ASSISTANT = "assistant"
+    AGENT = "agent"
+    THREAD = "thread"
 
     @classmethod
-    def to_list(cls) -> List[str]:
-        return [component.value for component in cls]
+    def to_list(cls, exclude: Optional[List["Component"]]) -> List[str]:
+        if exclude is None:
+            exclude = []
+        return [component.value for component in cls if component not in exclude]
 
 
-class ComponentSelection(BaseModel):
+class ComponentSelect(BaseModel):
     component: Component
 
 
-# ==============================================================================
-# Provider
-# ==============================================================================
+class ComponentItemSelect(BaseModel):
+    id: int
 
 
-class ProviderDetails(BaseModel):
+class ProviderBase(BaseModel):
     name: str
     api_key: str
 
 
-class ProviderSelection(BaseModel):
+class ProviderCreate(ProviderBase):
+    pass
+
+
+class ProviderResponse(BaseModel):
+    id: int
     name: str
+    api_key: str
+
+    class Config:
+        from_attributes = True
 
 
-# ==============================================================================
-# Model
-# ==============================================================================
-
-
-class ModelDetails(BaseModel):
+class AgentBase(BaseModel):
     name: str
-    provider_id: int
-
-
-class ModelSelection(BaseModel):
-    name: str
-
-
-# ==============================================================================
-# Assistant
-# ==============================================================================
-
-
-class AssistantDetails(BaseModel):
-    name: str
+    model: str
     description: str
-    model_id: int
 
 
-class AssistantSelection(BaseModel):
+class AgentCreate(AgentBase):
+    pass
+
+
+class AgentResponse(BaseModel):
+    id: int
     name: str
+    model: str
+    description: str
+
+    class Config:
+        from_attributes = True
+
+
+class ThreadBase(BaseModel):
+    name: str
+    agent_id: int
+    description: str
+
+
+class ThreadCreate(ThreadBase):
+    pass
+
+
+class ThreadResponse(BaseModel):
+    id: int
+    name: str
+    agent_id: int
+    description: str
+
+    class Config:
+        from_attributes = True

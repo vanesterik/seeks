@@ -1,265 +1,189 @@
-from typing import Dict, List, Optional, Union
+from typing import List, Union
 
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-from seeks.common.labels import Labels
-from seeks.core.database import Base, engine, get_database
-from seeks.core.models import Assistant, Model, Provider, Settings, Thread
-from seeks.utils.ellipse import ellipse
-from seeks.utils.mask_api_key import mask_api_key
-
-# ==============================================================================
-# General
-# ==============================================================================
+from seeks.core import models, schemas
 
 
-def initialize_database() -> None:
-    # Base.metadata.drop_all(engine)  # Only for developing/testing purposes
-    Base.metadata.create_all(bind=engine)
+class Commands:
+    def __init__(self, session: Session) -> None:
+        self._session = session
 
-    # Create default data
-    insert_default_assistants()
-    insert_settings()
+    def list_component(self, component: schemas.Component) -> Union[
+        List[schemas.ProviderResponse],
+        List[schemas.AgentResponse],
+        List[schemas.ThreadResponse],
+    ]:
+        """
+        List components.
 
+        Params
+        ------
+        - component (schemas.Component): Component to list.
 
-# ==============================================================================
-# Provider
-# ==============================================================================
+        Returns
+        -------
+        - Union[
+            List[schemas.ProviderResponse],
+            List[schemas.AgentResponse],
+            List[schemas.ThreadResponse],
+          ]: List of components.
 
+        """
 
-def list_providers() -> List[Dict[str, Union[int, str]]]:
-    database = next(get_database())
-    providers = database.query(Provider).all()
-    return [
-        {
-            "id": provider.id,
-            "name": provider.name,
-            "api_key": mask_api_key(provider.api_key),
-        }
-        for provider in providers
-    ]
+        if component == schemas.Component.PROVIDER:
+            providers = self._session.query(models.Provider).all()
+            return [
+                schemas.ProviderResponse.model_validate(provider)
+                for provider in providers
+            ]
 
+        if component == schemas.Component.AGENT:
+            agents = self._session.query(models.Agent).all()
+            return [schemas.AgentResponse.model_validate(agent) for agent in agents]
 
-def query_provider_names() -> List[str]:
-    database = next(get_database())
-    providers = database.query(Provider).all()
-    return [provider.name for provider in providers]
+        if component == schemas.Component.THREAD:
+            threads = self._session.query(models.Thread).all()
+            return [schemas.ThreadResponse.model_validate(thread) for thread in threads]
 
+        return []
 
-def query_provider_id(name: str) -> Optional[int]:
-    database = next(get_database())
-    provider = database.query(Provider).filter_by(name=name).first()
-    return provider.id if provider else None
-
-
-def register_provider(name: str, api_key: str) -> None:
-    database = next(get_database())
-    provider = Provider(name=name, api_key=api_key)
-    database.add(provider)
-    try:
-        database.commit()
-    except IntegrityError:
-        database.rollback()
-        raise ValueError(Labels.PROVIDER_EXISTS)
-
-
-def unregister_provider(name: str) -> None:
-    database = next(get_database())
-    provider = database.query(Provider).filter_by(name=name).first()
-    database.delete(provider)
-    database.commit()
-
-
-# ==============================================================================
-# Model
-# ==============================================================================
-
-
-def list_models() -> List[Dict[str, Union[int, str]]]:
-    database = next(get_database())
-    query = select(
-        Model.id,
-        Model.name,
-        Provider.name.label("provider"),
-    ).join(Provider)
-    models = database.execute(query).all()
-    return [
-        {
-            "id": model.id,
-            "name": model.name,
-            "provider": model.provider,
-        }
-        for model in models
-    ]
-
-
-def query_model_names() -> List[str]:
-    database = next(get_database())
-    models = database.query(Model).all()
-    return [model.name for model in models]
-
-
-def query_model_id(name: str) -> Optional[int]:
-    database = next(get_database())
-    model = database.query(Model).filter_by(name=name).first()
-    return model.id if model else None
-
-
-def register_model(name: str, provider_id: int) -> None:
-    database = next(get_database())
-    model = Model(name=name, provider_id=provider_id)
-    database.add(model)
-    try:
-        database.commit()
-    except IntegrityError:
-        database.rollback()
-        raise ValueError(Labels.MODEL_EXISTS)
-
-
-def unregister_model(name: str) -> None:
-    database = next(get_database())
-    provider = database.query(Model).filter_by(name=name).first()
-    database.delete(provider)
-    database.commit()
-
-
-# ==============================================================================
-# Assistant
-# ==============================================================================
-
-
-def insert_default_assistants() -> None:
-    default_assistant_id = query_assistant_id(Labels.DEFAULT)
-
-    if default_assistant_id is None:
-        register_assistant(
-            Labels.DEFAULT,
-            description=Labels.DEFAULT_INSTRUCTIONS,
-        )
-
-
-def list_assistants() -> List[Dict[str, Union[int, str]]]:
-    database = next(get_database())
-    assistants = database.query(Assistant).all()
-    return [
-        {
-            "id": assistant.id,
-            "name": assistant.name,
-            "description": ellipse(assistant.description),
-        }
-        for assistant in assistants
-    ]
-
-
-def query_assistant_names() -> List[str]:
-    database = next(get_database())
-    assistants = database.query(Assistant).all()
-    return [assistant.name for assistant in assistants]
-
-
-def query_assistant_id(name: str) -> Optional[int]:
-    database = next(get_database())
-    assistant = database.query(Assistant).filter_by(name=name).first()
-    return assistant.id if assistant else None
-
-
-def register_assistant(name: str, description: str) -> None:
-    database = next(get_database())
-    assistant = Assistant(name=name, description=description)
-    database.add(assistant)
-    try:
-        database.commit()
-    except IntegrityError:
-        database.rollback()
-        raise ValueError(Labels.ASSISTANT_EXISTS)
-
-
-def unregister_assistant(name: str) -> None:
-    database = next(get_database())
-    assistant = database.query(Assistant).filter_by(name=name).first()
-    database.delete(assistant)
-    database.commit()
-
-
-# ==============================================================================
-# Thread
-# ==============================================================================
-
-
-# ==============================================================================
-# Settings
-# ==============================================================================
-
-
-def insert_settings() -> None:
-    database = next(get_database())
-    query = select(Settings).filter_by(instance_id=1)
-    settings = database.execute(query).scalar_one_or_none()
-
-    if settings is None:
-        settings = Settings(instance_id=1)
-        database.add(settings)
-        database.commit()
-
-    default_assistant_id = query_assistant_id(Labels.DEFAULT)
-    update_settings(assistant_id=default_assistant_id)
-
-
-def update_settings(
-    provider_id: Optional[int] = None,
-    model_id: Optional[int] = None,
-    assistant_id: Optional[int] = None,
-    thread_id: Optional[int] = None,
-) -> None:
-    database = next(get_database())
-    query = select(Settings).filter_by(instance_id=1)
-    settings = database.execute(query).scalar_one_or_none()
-
-    components = {
-        "provider_id": provider_id,
-        "model_id": model_id,
-        "assistant_id": assistant_id,
-        "thread_id": thread_id,
-    }
-
-    for field, value in components.items():
-        if value is not None:
-            setattr(settings, field, value)
-
-    database.commit()
-
-
-def query_settings() -> Dict[str, List[str]]:
-    database = next(get_database())
-
-    query = (
-        select(
-            Provider.name.label("provider"),
-            Model.name.label("model"),
-            Assistant.name.label("assistant"),
-            Thread.name.label("thread"),
-        )
-        .select_from(Settings)
-        .outerjoin(Provider, Settings.provider_id == Provider.id)
-        .outerjoin(Model, Settings.model_id == Model.id)
-        .outerjoin(Assistant, Settings.assistant_id == Assistant.id)
-        .outerjoin(Thread, Settings.thread_id == Thread.id)
-        .filter(Settings.instance_id == 1)
-    )
-    settings = database.execute(query).first()
-
-    return {
-        "component": [
-            "provider",
-            "model",
-            "assistant",
-            "thread",
+    def create_component_item(
+        self,
+        component: schemas.Component,
+        component_item: Union[
+            schemas.ProviderCreate,
+            schemas.AgentCreate,
         ],
-        "name": [
-            settings.provider if settings.provider else "",
-            settings.model if settings.model else "",
-            settings.assistant if settings.assistant else "",
-            ellipse(settings.thread) if settings.thread else "",
+    ) -> None:
+        """
+        Create component item. Only providers and agents are supported, because
+        threads are created by default user input.
+
+        Params
+        ------
+        - component (schemas.Component): Component to create an item for.
+        - component_item (Union[
+            schemas.ProviderCreate, schemas.AgentCreate,
+          ]): Data to create component.
+
+        """
+
+        if component == schemas.Component.PROVIDER:
+            provider = models.Provider(**component_item.model_dump())
+            self._session.add(provider)
+            try:
+                self._session.commit()
+            except IntegrityError:
+                self._session.rollback()
+                raise ValueError("Provider already exists")
+
+        if component == schemas.Component.AGENT:
+            agent = models.Agent(**component_item.model_dump())
+            self._session.add(agent)
+            try:
+                self._session.commit()
+            except IntegrityError:
+                self._session.rollback()
+                raise ValueError("Agent already exists")
+
+    def read_component_item(
+        self, component: schemas.Component, component_item_id: int
+    ) -> Union[
+        schemas.ProviderResponse,
+        schemas.AgentResponse,
+        schemas.ThreadResponse,
+    ]:
+        """
+        Read component item.
+
+        Params
+        ------
+        - component (schemas.Component): Component to read.
+        - id (int): Component item id.
+
+        Returns
+        -------
+        - Union[
+            schemas.ProviderResponse,
+            schemas.AgentResponse,
+            schemas.ThreadResponse,
+          ]: Component item.
+
+        """
+
+        if component == schemas.Component.PROVIDER:
+            provider = self._session.query(models.Provider).get(component_item_id)
+            response = schemas.ProviderResponse.model_validate(provider)
+
+        if component == schemas.Component.AGENT:
+            agent = self._session.query(models.Agent).get(component_item_id)
+            response = schemas.AgentResponse.model_validate(agent)
+
+        if component == schemas.Component.THREAD:
+            thread = self._session.query(models.Thread).get(component_item_id)
+            response = schemas.ThreadResponse.model_validate(thread)
+
+        return response
+
+    def update_component_item(
+        self,
+        component: schemas.Component,
+        component_item: Union[
+            schemas.ProviderResponse,
+            schemas.ProviderResponse,
         ],
-    }
+    ) -> None:
+        """
+        Update component item.
+
+        Params
+        ------
+        - component (schemas.Component): Component to update.
+        - id (int): Component item id.
+        - component_item (Union[
+            schemas.ProviderUpdate, schemas.AgentUpdate,
+          ]): Data to update component.
+
+        """
+
+        if component == schemas.Component.PROVIDER:
+            provider = self._session.query(models.Provider).get(component_item.id)
+            provider.api_key = component_item.api_key
+            self._session.commit()
+
+        if component == schemas.Component.AGENT:
+            agent = self._session.query(models.Agent).get(component_item.id)
+            agent.name = component_item.name
+            agent.description = component_item.description
+            agent.model = component_item.model
+            self._session.commit()
+
+    def delete_component_item(
+        self, component: schemas.Component, component_item_id: int
+    ) -> None:
+        """
+        Delete component item.
+
+        Params
+        ------
+        - component (schemas.Component): Component to delete.
+        - id (int): Component item id.
+
+        """
+
+        if component == schemas.Component.PROVIDER:
+            provider = self._session.query(models.Provider).get(component_item_id)
+            self._session.delete(provider)
+            self._session.commit()
+
+        if component == schemas.Component.AGENT:
+            agent = self._session.query(models.Agent).get(component_item_id)
+            self._session.delete(agent)
+            self._session.commit()
+
+        if component == schemas.Component.THREAD:
+            thread = self._session.query(models.Thread).get(component_item_id)
+            self._session.delete(thread)
+            self._session.commit()
