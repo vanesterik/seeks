@@ -1,9 +1,10 @@
 from enum import Enum
-from typing import List
+from typing import List, Union
 
 from sqlalchemy import Column
 from sqlalchemy import Enum as SQLAlchemyEnum
 from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -107,6 +108,14 @@ class Settings(Base):
         ForeignKey("thread.id"),
         nullable=True,
     )
+
+    @hybrid_property
+    def assistant_name(self) -> Union[str, None]:
+        return self.assistant.name if self.assistant else None
+
+    @hybrid_property
+    def thread_name(self) -> Union[str, None]:
+        return self.thread.name if self.thread else None
 
     def __repr__(self) -> str:
         return "<Settings(id={}, assistant_id={}, thread_id={})>".format(

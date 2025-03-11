@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -8,6 +8,7 @@ class Component(Enum):
     PROVIDER = "provider"
     ASSISTANT = "assistant"
     THREAD = "thread"
+    SETTINGS = "settings"
 
     @classmethod
     def to_list(cls, exclude: Optional[List["Component"]]) -> List[str]:
@@ -18,10 +19,6 @@ class Component(Enum):
 
 class ComponentSelect(BaseModel):
     component: Component
-
-
-class ComponentItemSelect(BaseModel):
-    id: int
 
 
 class ProviderBase(BaseModel):
@@ -77,6 +74,24 @@ class ThreadResponse(BaseModel):
     name: str
     assistant_id: int
     description: str
+
+    class Config:
+        from_attributes = True
+
+
+class SettingsResponse(BaseModel):
+    id: int
+    assistant_id: int
+    thread_id: Union[int, None]
+
+    class Config:
+        from_attributes = True
+
+
+class SettingsVerboseResponse(BaseModel):
+    id: int
+    assistant_name: Union[str, None]
+    thread_name: Union[str, None]
 
     class Config:
         from_attributes = True

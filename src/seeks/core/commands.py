@@ -1,5 +1,6 @@
-from typing import List, Union
+from typing import List, Optional, Union
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -10,183 +11,228 @@ class Commands:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def list_component(self, component: schemas.Component) -> Union[
-        List[schemas.ProviderResponse],
-        List[schemas.AssistantResponse],
-        List[schemas.ThreadResponse],
-    ]:
+    def create_provider(self, provider: schemas.ProviderCreate) -> None:
         """
-        List components.
+        Create provider.
 
         Params
         ------
-        - component (schemas.Component): Component to list.
+        - provider (ProviderCreate): Provider to create.
+
+        """
+
+        provider = models.Provider(**provider.model_dump())
+        self._session.add(provider)
+
+        try:
+            self._session.commit()
+
+        except IntegrityError:
+            self._session.rollback()
+            raise ValueError("Provider already exists")
+
+    def create_assistant(self, assistant: schemas.AssistantCreate) -> None:
+        """
+        Create assistant.
+
+        Params
+        ------
+        - assistant (AssistantCreate): Assistant to create.
+
+        """
+
+        assistant = models.Assistant(**assistant.model_dump())
+        self._session.add(assistant)
+
+        try:
+            self._session.commit()
+
+        except IntegrityError:
+            self._session.rollback()
+            raise ValueError("Assistant already exists")
+
+    def read_providers(self) -> List[schemas.ProviderResponse]:
+        """
+        Return all providers.
 
         Returns
         -------
-        - Union[
-            List[schemas.ProviderResponse],
-            List[schemas.AssistantResponse],
-            List[schemas.ThreadResponse],
-          ]: List of components.
+        - List[ProviderResponse]: Provider(s).
 
         """
 
-        if component == schemas.Component.PROVIDER:
-            providers = self._session.query(models.Provider).all()
-            return [
-                schemas.ProviderResponse.model_validate(provider)
-                for provider in providers
-            ]
+        records = self._session.scalars(select(models.Provider)).all()
+        return [schemas.ProviderResponse.model_validate(record) for record in records]
 
-        if component == schemas.Component.ASSISTANT:
-            assistants = self._session.query(models.Assistant).all()
-            return [
-                schemas.AssistantResponse.model_validate(assistant)
-                for assistant in assistants
-            ]
-
-        if component == schemas.Component.THREAD:
-            threads = self._session.query(models.Thread).all()
-            return [schemas.ThreadResponse.model_validate(thread) for thread in threads]
-
-        return []
-
-    def create_component_item(
-        self,
-        component: schemas.Component,
-        component_item: Union[
-            schemas.ProviderCreate,
-            schemas.AssistantCreate,
-        ],
-    ) -> None:
+    def read_assistants(self) -> List[schemas.AssistantResponse]:
         """
-        Create component item. Only providers and assistants are supported,
-        because threads are created by default user input.
-
-        Params
-        ------
-        - component (schemas.Component): Component to create an item for.
-        - component_item (Union[
-            schemas.ProviderCreate, schemas.AssistantCreate,
-          ]): Data to create component.
-
-        """
-
-        if component == schemas.Component.PROVIDER:
-            provider = models.Provider(**component_item.model_dump())
-            self._session.add(provider)
-            try:
-                self._session.commit()
-            except IntegrityError:
-                self._session.rollback()
-                raise ValueError("Provider already exists")
-
-        if component == schemas.Component.ASSISTANT:
-            assistant = models.Assistant(**component_item.model_dump())
-            self._session.add(assistant)
-            try:
-                self._session.commit()
-            except IntegrityError:
-                self._session.rollback()
-                raise ValueError("Assistant already exists")
-
-    def read_component_item(
-        self, component: schemas.Component, component_item_id: int
-    ) -> Union[
-        schemas.ProviderResponse,
-        schemas.AssistantResponse,
-        schemas.ThreadResponse,
-    ]:
-        """
-        Read component item.
-
-        Params
-        ------
-        - component (schemas.Component): Component to read.
-        - id (int): Component item id.
+        Return all assistants.
 
         Returns
         -------
-        - Union[
-            schemas.ProviderResponse,
-            schemas.AssistantResponse,
-            schemas.ThreadResponse,
-          ]: Component item.
+        - List[AssistantResponse]: Assistant(s).
 
         """
 
-        if component == schemas.Component.PROVIDER:
-            provider = self._session.query(models.Provider).get(component_item_id)
-            response = schemas.ProviderResponse.model_validate(provider)
+        records = self._session.scalars(select(models.Assistant)).all()
+        return [schemas.AssistantResponse.model_validate(record) for record in records]
 
-        if component == schemas.Component.ASSISTANT:
-            assistant = self._session.query(models.Assistant).get(component_item_id)
-            response = schemas.AssistantResponse.model_validate(assistant)
+    def read_threads(
+        self, assistant_id: Optional[int] = None
+    ) -> List[schemas.ThreadResponse]:
+        """
+        Return all threads or return threads filtered by assistant id.
 
-        if component == schemas.Component.THREAD:
-            thread = self._session.query(models.Thread).get(component_item_id)
-            response = schemas.ThreadResponse.model_validate(thread)
+        Params
+        ------
+        - assistant_id (Optional[int]): Assistant id.
 
-        return response
+        Returns
+        -------
+        - List[ThreadResponse]: Thread(s).
 
-    def update_component_item(
+        """
+
+        if assistant_id:
+            records = self._session.scalars(
+                select(models.Thread).filter_by(assistant_id=assistant_id)
+            ).all()
+            return [schemas.ThreadResponse.model_validate(record) for record in records]
+
+        records = self._session.scalars(select(models.Thread)).all()
+        return [schemas.ThreadResponse.model_validate(record) for record in records]
+
+    def read_settings(
         self,
-        component: schemas.Component,
-        component_item: Union[
-            schemas.ProviderResponse,
-            schemas.ProviderResponse,
-        ],
-    ) -> None:
+        verbose: Optional[bool] = False,
+    ) -> Union[schemas.SettingsResponse, None]:
         """
-        Update component item.
+        Return all settings. Return only the first record as it should be
+        unique, due its constraints set in the database.
+
+        Returns
+        -------
+        - SettingsResponse: Settings.
+
+        """
+
+        record = self._session.scalar(select(models.Settings))
+
+        if not record:
+            return None
+
+        if verbose:
+            return schemas.SettingsVerboseResponse.model_validate(record)
+
+        return schemas.SettingsResponse.model_validate(record)
+
+    def update_provider(self, provider: schemas.ProviderResponse) -> None:
+        """
+        Update provider by id within passed payload. Only the `api_key` can be
+        updated, as the name is a static value defined in the configuration
+        file.
 
         Params
         ------
-        - component (schemas.Component): Component to update.
-        - id (int): Component item id.
-        - component_item (Union[
-            schemas.ProviderUpdate, schemas.AssistantUpdate,
-          ]): Data to update component.
+        - provider (ProviderUpdate): Provider to update.
 
         """
 
-        if component == schemas.Component.PROVIDER:
-            provider = self._session.query(models.Provider).get(component_item.id)
-            provider.api_key = component_item.api_key
-            self._session.commit()
+        record = self._session.get(models.Provider, provider.id)
 
-        if component == schemas.Component.ASSISTANT:
-            assistant = self._session.query(models.Assistant).get(component_item.id)
-            assistant.name = component_item.name
-            assistant.description = component_item.description
-            assistant.model = component_item.model
-            self._session.commit()
+        if not record:
+            return None
 
-    def delete_component_item(
-        self, component: schemas.Component, component_item_id: int
-    ) -> None:
+        record.api_key = provider.api_key
+        self._session.commit()
+
+    def update_assistant(self, assistant: schemas.ProviderResponse) -> None:
         """
-        Delete component item.
+        Update assistant by id within passed payload.
 
         Params
         ------
-        - component (schemas.Component): Component to delete.
-        - id (int): Component item id.
+        - assistant (schemas.AssistantUpdate): Assistant to update.
 
         """
 
-        if component == schemas.Component.PROVIDER:
-            provider = self._session.query(models.Provider).get(component_item_id)
-            self._session.delete(provider)
-            self._session.commit()
+        record = self._session.get(models.Assistant, assistant.id)
 
-        if component == schemas.Component.ASSISTANT:
-            assistant = self._session.query(models.Assistant).get(component_item_id)
-            self._session.delete(assistant)
-            self._session.commit()
+        if not record:
+            return None
 
-        if component == schemas.Component.THREAD:
-            thread = self._session.query(models.Thread).get(component_item_id)
-            self._session.delete(thread)
-            self._session.commit()
+        record.name = assistant.name
+        record.description = assistant.description
+        record.model = assistant.model
+        self._session.commit()
+
+    def update_settings(
+        self,
+        assistant_id: Optional[int] = None,
+        thread_id: Optional[int] = None,
+    ) -> None:
+        """
+        Update assistant settings.
+
+        Params
+        ------
+        - assistant_id (int): Assistant id.
+        - thread_id (Optional[int]): Thread id.
+
+        """
+
+        record = self._session.scalar(select(models.Settings))
+
+        if not record:
+            record = models.Settings()
+            self._session.add(record)
+
+        if assistant_id:
+            record.assistant_id = assistant_id
+
+        if thread_id:
+            record.thread_id = thread_id
+
+        self._session.commit()
+
+    def delete_provider(self, provider_id: int) -> None:
+        """
+        Delete provider by id.
+
+        Params
+        ------
+        - provider_id (int): Provider id.
+
+        """
+
+        record = self._session.get(models.Provider, provider_id)
+        self._session.delete(record)
+        self._session.commit()
+
+    def delete_assistant(self, assistant_id: int) -> None:
+        """
+        Delete assistant by id.
+
+        Params
+        ------
+        - assistant_id (int): Assistant id.
+
+        """
+
+        record = self._session.get(models.Assistant, assistant_id)
+        self._session.delete(record)
+        self._session.commit()
+
+    def delete_thread(self, thread_id: int) -> None:
+        """
+        Delete thread by id.
+
+        Params
+        ------
+        - thread_id (int): Thread id.
+
+        """
+
+        record = self._session.get(models.Thread, thread_id)
+        self._session.delete(record)
+        self._session.commit()

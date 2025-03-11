@@ -7,7 +7,6 @@ from seeks.common.config import Config
 from seeks.core import schemas
 from seeks.core.commands import Commands
 from seeks.core.prompts import Prompts
-from seeks.utils.clear_screen import clear_screen
 from seeks.utils.ellipse import ellipse
 from seeks.utils.get_home_dir import get_home_dir
 from seeks.utils.get_project_version import get_project_version
@@ -118,27 +117,30 @@ class Shell(cmd.Cmd):
             print_alert("Component selection cancelled", type="warning")
             return None
 
-        component_items = self._commands.list_component(component.component)
-
-        if not component_items:
-            print_alert(
-                f"No {component.component.value}s registered",
-                type="warning",
-            )
-            return None
-
         if component.component == schemas.Component.PROVIDER:
+            providers = self._commands.read_providers()
+
+            if not providers:
+                print_alert("No providers created", type="warning")
+                return None
+
             providers = [
                 schemas.ProviderResponse(
                     id=provider.id,
                     name=self._config.find_provider(provider.name).display_name,
                     api_key=mask_api_key(provider.api_key),
                 )
-                for provider in component_items
+                for provider in providers
             ]
             print_table(providers)
 
         if component.component == schemas.Component.ASSISTANT:
+            assistants = self._commands.read_assistants()
+
+            if not assistants:
+                print_alert("No assistants created", type="warning")
+                return None
+
             assistants = [
                 schemas.AssistantResponse(
                     id=assistant.id,
@@ -146,12 +148,34 @@ class Shell(cmd.Cmd):
                     model=assistant.model,
                     description=ellipse(assistant.description),
                 )
-                for assistant in component_items
+                for assistant in assistants
             ]
             print_table(assistants)
 
         if component.component == schemas.Component.THREAD:
-            print_table(component_items)
+            threads = self._commands.read_threads()
+
+            if not threads:
+                print_alert("No threads created", type="warning")
+                return None
+
+            print_table(threads)
+
+        if component.component == schemas.Component.SETTINGS:
+            settings = self._commands.read_settings(verbose=True)
+
+            if not settings:
+                print_alert("No settings created", type="warning")
+                return None
+
+            settings = [
+                schemas.SettingsVerboseResponse(
+                    id=settings.id,
+                    assistant_name=settings.assistant_name,
+                    thread_name=ellipse(settings.thread_name),
+                )
+            ]
+            print_table(settings)
 
     def do_create(self, _: str) -> None:
         """
@@ -167,7 +191,12 @@ class Shell(cmd.Cmd):
 
         """
 
-        component = self._prompts.select_component(exclude=[schemas.Component.THREAD])
+        component = self._prompts.select_component(
+            exclude=[
+                schemas.Component.THREAD,
+                schemas.Component.SETTINGS,
+            ]
+        )
 
         if component is None:
             print_alert("Component selection cancelled", type="warning")
@@ -181,10 +210,7 @@ class Shell(cmd.Cmd):
                 return None
 
             try:
-                self._commands.create_component_item(
-                    component=component.component,
-                    component_item=provider,
-                )
+                self._commands.create_provider(provider)
                 print_alert("Provider created", type="success")
 
             except ValueError as error:
@@ -198,10 +224,7 @@ class Shell(cmd.Cmd):
                 return None
 
             try:
-                self._commands.create_component_item(
-                    component=component.component,
-                    component_item=assistant,
-                )
+                self._commands.create_assistant(assistant)
                 print_alert("Assistant created", type="success")
 
             except ValueError as error:
@@ -212,7 +235,8 @@ class Shell(cmd.Cmd):
         Shell command to update component entry in database:
 
         - provider
-        - Assistant
+        - assistant
+        - settings
 
         Remarks
         -------
@@ -221,69 +245,133 @@ class Shell(cmd.Cmd):
           allowed to be changed.
         - Threads are excluded as these are created by user input in the default
           flow of the application.
+        - Settings follow a different flow as these are updates for the single
+          record the settings table holds.
 
         """
 
-        component = self._prompts.select_component(exclude=[schemas.Component.THREAD])
+        component = self._prompts.select_component(
+            exclude=[
+                schemas.Component.THREAD,
+            ]
+        )
 
         if component is None:
             print_alert("Component selection cancelled", type="warning")
             return None
 
-        component_items = self._commands.list_component(component.component)
-
-        if not component_items:
-            print_alert(
-                f"No {component.component.value}s to update",
-                type="warning",
-            )
-            return None
-
-        component_item = self._prompts.select_component_item(
-            component=component.component,
-            component_items=component_items,
-        )
-
-        if component_item is None:
-            print_alert(
-                f"{component.component.value} selection cancelled",
-                type="warning",
-            )
-            return None
-
         if component.component == schemas.Component.PROVIDER:
-            provider = self._commands.read_component_item(
-                component=component.component,
-                component_item_id=component_item.id,
-            )
+            providers = self._commands.read_providers()
+
+            if not providers:
+                print_alert("No providers to update", type="warning")
+                return None
+
+            provider = self._prompts.select_provider(providers)
+
+            if provider is None:
+                print_alert("Provider selection cancelled", type="warning")
+                return None
+
             provider = self._prompts.update_provider(provider)
 
             if provider is None:
                 print_alert("Provider update cancelled", type="warning")
                 return None
 
-            self._commands.update_component_item(
-                component=component.component,
-                component_item=provider,
-            )
+            self._commands.update_provider(provider)
             print_alert("Provider updated", type="success")
 
         if component.component == schemas.Component.ASSISTANT:
-            assistant = self._commands.read_component_item(
-                component=component.component,
-                component_item_id=component_item.id,
-            )
+            assistants = self._commands.read_assistants()
+
+            if not assistants:
+                print_alert("No assistants to update", type="warning")
+                return None
+
+            assistant = self._prompts.select_assistant(assistants)
+
+            if assistant is None:
+                print_alert("Assistant selection cancelled", type="warning")
+                return None
+
             assistant = self._prompts.update_assistant(assistant)
 
             if assistant is None:
                 print_alert("Assistant update cancelled", type="warning")
                 return None
 
-            self._commands.update_component_item(
-                component=component.component,
-                component_item=assistant,
-            )
+            self._commands.update_assistant(assistant)
             print_alert("Assistant updated", type="success")
+
+        if component.component == schemas.Component.SETTINGS:
+            component = self._prompts.select_component(
+                exclude=[
+                    schemas.Component.PROVIDER,
+                    schemas.Component.SETTINGS,
+                ],
+                message="Select setting",
+            )
+
+            if component is None:
+                print_alert("Setting selection cancelled", type="warning")
+                return None
+
+            if component.component == schemas.Component.ASSISTANT:
+                assistants = self._commands.read_assistants()
+
+                if not assistants:
+                    print_alert("No assistants to set", type="warning")
+                    return None
+
+                assistant = self._prompts.select_assistant(assistants)
+
+                if assistant is None:
+                    print_alert("Assistant selection cancelled", type="warning")
+                    return None
+
+                threads = self._commands.read_threads(assistant_id=assistant.id)
+
+                if not threads:
+                    self._commands.update_settings(assistant_id=assistant.id)
+                    print_alert("Settings updated", type="success")
+                    return None
+
+                thread = self._prompts.select_thread(threads)
+
+                if thread is None:
+                    print_alert("Thread selection cancelled", type="warning")
+                    return None
+
+                self._commands.update_settings(
+                    assistant_id=assistant.id,
+                    thread_id=thread.id,
+                )
+                print_alert("Settings updated", type="success")
+
+            if component.component == schemas.Component.THREAD:
+                settings = self._commands.read_settings()
+
+                if not settings:
+                    print_alert("No settings to read", type="warning")
+                    return None
+
+                threads = self._commands.read_threads(
+                    assistant_id=settings.assistant_id
+                )
+
+                if not threads:
+                    print_alert("No threads to set", type="warning")
+                    return None
+
+                thread = self._prompts.select_thread(threads)
+
+                if thread is None:
+                    print_alert("Thread selection cancelled", type="warning")
+                    return None
+
+                self._commands.update_settings(thread_id=thread.id)
+                print_alert("Settings updated", type="success")
 
     def do_delete(self, _: str) -> None:
         """
@@ -295,38 +383,60 @@ class Shell(cmd.Cmd):
 
         """
 
-        component = self._prompts.select_component()
+        component = self._prompts.select_component(
+            exclude=[
+                schemas.Component.SETTINGS,
+            ]
+        )
 
         if component is None:
             print_alert("Component selection cancelled", type="warning")
             return
 
-        component_items = self._commands.list_component(component.component)
+        if component.component == schemas.Component.PROVIDER:
+            providers = self._commands.read_providers()
 
-        if not component_items:
-            print_alert(
-                f"No {component.component.value}s to delete",
-                type="warning",
-            )
-            return None
+            if not providers:
+                print_alert("No providerss to delete", type="warning")
+                return None
 
-        component_item = self._prompts.select_component_item(
-            component=component.component,
-            component_items=component_items,
-        )
+            provider = self._prompts.select_provider(providers)
 
-        if component_item is None:
-            print_alert(
-                f"{component.component.value} selection cancelled",
-                type="warning",
-            )
-            return None
+            if provider is None:
+                print_alert("Provider selection cancelled", type="warning")
+                return None
 
-        self._commands.delete_component_item(
-            component=component.component,
-            component_item_id=component_item.id,
-        )
-        print_alert(
-            f"{component.component.value} deleted",
-            type="success",
-        )
+            self._commands.delete_provider(provider.id)
+            print_alert("Provider deleted", type="success")
+
+        if component.component == schemas.Component.ASSISTANT:
+            assistants = self._commands.read_assistants()
+
+            if not assistants:
+                print_alert("No assistants to delete", type="warning")
+                return None
+
+            assistant = self._prompts.select_assistant(assistants)
+
+            if assistant is None:
+                print_alert("Assistant selection cancelled", type="warning")
+                return None
+
+            self._commands.delete_assistant(assistant.id)
+            print_alert("Assistant deleted", type="success")
+
+        if component.component == schemas.Component.THREAD:
+            threads = self._commands.read_threads()
+
+            if not threads:
+                print_alert("No threads to delete", type="warning")
+                return None
+
+            thread = self._prompts.select_thread(threads)
+
+            if thread is None:
+                print_alert("Thread selection cancelled", type="warning")
+                return None
+
+            self._commands.delete_thread(thread.id)
+            print_alert("Thread deleted", type="success")

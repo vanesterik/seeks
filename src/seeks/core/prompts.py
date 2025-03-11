@@ -11,7 +11,9 @@ class Prompts:
         self._config = config
 
     def select_component(
-        self, exclude: Optional[List[schemas.Component]] = None
+        self,
+        exclude: Optional[List[schemas.Component]] = None,
+        message: str = "Select component",
     ) -> Union[schemas.ComponentSelect, None]:
         """
         Prompt to select a component:
@@ -19,11 +21,14 @@ class Prompts:
         - provider
         - assistant
         - thread
+        - settings
 
         Params
         ------
         - exclude (Optional[List[schemas.Component]]): Param to exclude
           component from original list. Defaults to None.
+        - message (str): Message to display in prompt. Defaults to "Select
+          component".
 
         Returns
         -------
@@ -36,7 +41,7 @@ class Prompts:
             {
                 "type": "select",
                 "name": "component",
-                "message": "Select component",
+                "message": message,
                 "choices": schemas.Component.to_list(exclude=exclude),
             },
         ]
@@ -47,78 +52,124 @@ class Prompts:
 
         return schemas.ComponentSelect(**result)
 
-    def select_component_item(
-        self,
-        component: schemas.Component,
-        component_items: Union[
-            List[schemas.ProviderResponse],
-            List[schemas.AssistantResponse],
-            List[schemas.ThreadResponse],
-        ],
-    ) -> Union[schemas.ComponentItemSelect, None]:
+    def select_provider(
+        self, providers: List[schemas.ProviderResponse]
+    ) -> Union[schemas.ProviderResponse, None]:
         """
-        Prompt to select a component item from passed list of component items.
+        Prompt to select provider.
 
         Params
         ------
-        - component (schemas.Component): Component to select item from.
-        - component_items (Union[
-            List[schemas.ProviderResponse],
-            List[schemas.AssistantResponse],
-            List[schemas.ThreadResponse],
-          ]): List of component items.
+        - providers (List[schemas.ProviderResponse]): List of providers.
 
         Returns
         -------
-        - Union[schemas.ComponentItemSelect, None]: Selected component item or
-          None in case user cancels.
+        - Union[schemas.ProviderResponse, None]: Selected provider or None in
+          case user cancels.
 
         """
 
-        if component == schemas.Component.PROVIDER:
-            choices = [
-                Choice(
-                    title=self._config.find_provider(provider.name).display_name,
-                    value=provider.id,
-                )
-                for provider in component_items
-            ]
-            message = "Select provider"
-
-        if component == schemas.Component.ASSISTANT:
-            choices = [
-                Choice(
-                    title=assistant.name,
-                    value=assistant.id,
-                )
-                for assistant in component_items
-            ]
-            message = "Select Assistant"
-
-        if component == schemas.Component.THREAD:
-            choices = [
-                Choice(
-                    title=thread.id,
-                    value=thread.id,
-                )
-                for thread in component_items
-            ]
-            message = "Select thread"
-
+        choices = [
+            Choice(
+                title=self._config.find_provider(provider.name).display_name,
+                value=provider.id,
+            )
+            for provider in providers
+        ]
         questions = [
             {
                 "type": "select",
                 "name": "id",
-                "message": message,
+                "message": "Select provider",
                 "choices": choices,
             },
         ]
-
         result = prompt(questions, kbi_msg="")
+
         if not result:
             return None
 
-        return schemas.ComponentItemSelect(**result)
+        return next(provider for provider in providers if provider.id == result["id"])
+
+    def select_assistant(
+        self, assistants: List[schemas.AssistantResponse]
+    ) -> Union[schemas.AssistantResponse, None]:
+        """
+        Prompt to select assistant.
+
+        Params
+        ------
+        - assistants (List[schemas.AssistantResponse]): List of assistants.
+
+        Returns
+        -------
+        - Union[schemas.AssistantResponse, None]: Selected assistant or None in
+          case user cancels.
+
+        """
+
+        choices = [
+            Choice(
+                title=assistant.name,
+                value=assistant.id,
+            )
+            for assistant in assistants
+        ]
+        questions = [
+            {
+                "type": "select",
+                "name": "id",
+                "message": "Select assistant",
+                "choices": choices,
+            },
+        ]
+        result = prompt(questions, kbi_msg="")
+
+        if not result:
+            return None
+
+        return next(
+            assistant for assistant in assistants if assistant.id == result["id"]
+        )
+
+    def select_thread(
+        self, threads: List[schemas.ThreadResponse]
+    ) -> Union[schemas.ThreadResponse, None]:
+        """
+        Prompt to select thread.
+
+        Params
+        ------
+        - threads (List[schemas.ThreadResponse]): List of threads.
+
+        Returns
+        -------
+        - Union[schemas.ThreadResponse, None]: Selected thread or None in
+          case user cancels.
+
+        """
+
+        choices = [
+            Choice(
+                title=thread.id,
+                value=thread.id,
+            )
+            for thread in threads
+        ]
+        questions = [
+            {
+                "type": "select",
+                "name": "id",
+                "message": "Select thread",
+                "choices": choices,
+            },
+        ]
+        result = prompt(questions, kbi_msg="")
+
+        if not result:
+            return None
+
+        return next(thread for thread in threads if thread.id == result["id"])
 
     def create_provider(self) -> Union[schemas.ProviderCreate, None]:
         """
