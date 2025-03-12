@@ -114,20 +114,21 @@ class Shell(cmd.Cmd):
             )
             return None
 
-        if settings.thread_id is None:
+        thread_id = settings.thread_id
+
+        if thread_id is None:
             thread = self._commands.create_thread(
                 schemas.ThreadCreate(
                     subject=prompt,
                     assistant_id=settings.assistant_id,
                 )
             )
-            self._commands.update_settings(thread_id=thread.id)
-
-        settings = self._commands.read_settings()
+            thread_id = thread.id
+            self._commands.update_settings(thread_id=thread_id)
 
         self._commands.create_message(
             schemas.MessageCreate(
-                thread_id=settings.thread_id,
+                thread_id=thread_id,
                 role=schemas.Role.USER,
                 content=prompt,
             )
@@ -205,6 +206,14 @@ class Shell(cmd.Cmd):
                 print_alert("No threads created", type="warning")
                 return None
 
+            threads = [
+                schemas.ThreadVerboseResponse(
+                    id=thread.id,
+                    assistant_name=thread.assistant_name,
+                    subject=ellipse(thread.subject),
+                )
+                for thread in threads
+            ]
             print_table(threads)
 
         if component.component == schemas.Component.SETTINGS:
