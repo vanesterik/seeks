@@ -60,13 +60,21 @@ lint:
 
 ## Run main script
 run:
-	-pdm run ./${PACKAGE}/main.py
+	pdm run ./${PACKAGE}/main.py
 
 
 ## Run main script in development mode
 dev:
-	watchmedo auto-restart --directory=./src --pattern=*.py --recursive -- make run
+	@watchmedo \
+		auto-restart \
+		--directory=./src \
+		--pattern=*.py \
+		--recursive \
+		-- pdm run ./${PACKAGE}/main.py --debug
 
+## Run main script but flush database and reseed
+flush:
+	pdm run ./${PACKAGE}/main.py --flush
 
 ################################################################################
 # Self Documenting Commands                                                    #

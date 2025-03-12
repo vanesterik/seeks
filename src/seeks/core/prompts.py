@@ -42,7 +42,7 @@ class Prompts:
                 "type": "select",
                 "name": "component",
                 "message": message,
-                "choices": schemas.Component.to_list(exclude=exclude),
+                "choices": schemas.Component.to_list(exclude),
             },
         ]
         result = prompt(questions, kbi_msg="")
@@ -151,7 +151,7 @@ class Prompts:
 
         choices = [
             Choice(
-                title=thread.id,
+                title=thread.subject,
                 value=thread.id,
             )
             for thread in threads
@@ -210,7 +210,9 @@ class Prompts:
 
         return schemas.ProviderCreate(**result)
 
-    def create_assistant(self) -> Union[schemas.AssistantCreate, None]:
+    def create_assistant(
+        self, providers: List[schemas.ProviderResponse]
+    ) -> Union[schemas.AssistantCreate, None]:
         """
         Prompt to create assistant.
 
@@ -221,6 +223,7 @@ class Prompts:
 
         """
 
+        provider_names = [provider.name for provider in providers]
         questions = [
             {
                 "type": "text",
@@ -232,7 +235,7 @@ class Prompts:
                 "type": "select",
                 "name": "model",
                 "message": "Model",
-                "choices": self._config.list_models(),
+                "choices": self._config.list_models(provider_names),
             },
             {
                 "type": "text",
@@ -278,7 +281,9 @@ class Prompts:
         return schemas.ProviderResponse(**{**provider_data, **result})
 
     def update_assistant(
-        self, assistant: schemas.AssistantResponse
+        self,
+        providers: List[schemas.ProviderResponse],
+        assistant: schemas.AssistantResponse,
     ) -> Union[schemas.AssistantResponse, None]:
         """
         Prompt to update assistant.
@@ -290,6 +295,7 @@ class Prompts:
 
         """
 
+        provider_names = [provider.name for provider in providers]
         questions = [
             {
                 "type": "text",
@@ -302,7 +308,7 @@ class Prompts:
                 "type": "select",
                 "name": "model",
                 "message": "Model",
-                "choices": self._config.list_models(),
+                "choices": self._config.list_models(provider_names),
                 "default": assistant.model,
             },
             {

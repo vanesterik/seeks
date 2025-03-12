@@ -29,14 +29,9 @@ class Shell(cmd.Cmd):
         self._prompts = prompts
         self._init_history()
 
-        self.intro = (
-            "\n".join(
-                [
-                    f"SEEKS {get_project_version()}",
-                    "Type 'help' or '?' for more information.",
-                ]
-            )
-            + "\n"
+        self.intro = "{}\n{}\n".format(
+            f"SEEKS {get_project_version()}",
+            "Type 'help' or '?' for more information.",
         )
         self.prompt = ">>> "
 
@@ -68,8 +63,13 @@ class Shell(cmd.Cmd):
         session gracefully.
 
         """
+
+        # Clear thread setting before running the shell to ensure a clean start.
+        self._commands.delete_thread_setting()
+
         try:
             self.cmdloop()
+
         except KeyboardInterrupt:
             print("Exiting...")
 
@@ -80,12 +80,58 @@ class Shell(cmd.Cmd):
         """
         return False
 
-    def default(self, arg: str) -> None:
+    def default(self, prompt: str) -> None:
         """
         Everything which is not a command, is considered to be input for the
-        selected model and will be processed accordingly.
+        configured settings and will be processed accordingly.
+
         """
-        print(f"\n{arg}\n")
+
+        providers = self._commands.read_providers()
+
+        if not providers:
+            print_alert(
+                "No providers found. Provider is required to use system.",
+                type="error",
+            )
+            return None
+
+        assistants = self._commands.read_assistants()
+
+        if not assistants:
+            print_alert(
+                "No assistants found. Assistant is required to use system.",
+                type="error",
+            )
+            return None
+
+        settings = self._commands.read_settings()
+
+        if not settings:
+            print_alert(
+                "No settings configured. Minimum requirement to use system is to set assistant setting.",
+                type="error",
+            )
+            return None
+
+        if settings.thread_id is None:
+            thread = self._commands.create_thread(
+                schemas.ThreadCreate(
+                    subject=prompt,
+                    assistant_id=settings.assistant_id,
+                )
+            )
+            self._commands.update_settings(thread_id=thread.id)
+
+        settings = self._commands.read_settings()
+
+        self._commands.create_message(
+            schemas.MessageCreate(
+                thread_id=settings.thread_id,
+                role=schemas.Role.USER,
+                content=prompt,
+            )
+        )
 
     def do_quit(self, _: str) -> bool:
         """
@@ -153,7 +199,7 @@ class Shell(cmd.Cmd):
             print_table(assistants)
 
         if component.component == schemas.Component.THREAD:
-            threads = self._commands.read_threads()
+            threads = self._commands.read_threads(verbose=True)
 
             if not threads:
                 print_alert("No threads created", type="warning")
@@ -172,7 +218,7 @@ class Shell(cmd.Cmd):
                 schemas.SettingsVerboseResponse(
                     id=settings.id,
                     assistant_name=settings.assistant_name,
-                    thread_name=ellipse(settings.thread_name),
+                    thread_subject=ellipse(settings.thread_subject),
                 )
             ]
             print_table(settings)
@@ -217,7 +263,16 @@ class Shell(cmd.Cmd):
                 print_alert(str(error), type="error")
 
         if component.component == schemas.Component.ASSISTANT:
-            assistant = self._prompts.create_assistant()
+            providers = self._commands.read_providers()
+
+            if not providers:
+                print_alert(
+                    "No providers available to create assistant",
+                    type="warning",
+                )
+                return None
+
+            assistant = self._prompts.create_assistant(providers)
 
             if assistant is None:
                 print_alert("Assistant creation cancelled", type="warning")
@@ -283,6 +338,15 @@ class Shell(cmd.Cmd):
             print_alert("Provider updated", type="success")
 
         if component.component == schemas.Component.ASSISTANT:
+            providers = self._commands.read_providers()
+
+            if not providers:
+                print_alert(
+                    "No providers available to update assistant",
+                    type="warning",
+                )
+                return None
+
             assistants = self._commands.read_assistants()
 
             if not assistants:
@@ -295,7 +359,7 @@ class Shell(cmd.Cmd):
                 print_alert("Assistant selection cancelled", type="warning")
                 return None
 
-            assistant = self._prompts.update_assistant(assistant)
+            assistant = self._prompts.update_assistant(providers, assistant)
 
             if assistant is None:
                 print_alert("Assistant update cancelled", type="warning")
@@ -353,7 +417,10 @@ class Shell(cmd.Cmd):
                 settings = self._commands.read_settings()
 
                 if not settings:
-                    print_alert("No settings to read", type="warning")
+                    print_alert(
+                        "No assistant setting available to set thread",
+                        type="warning",
+                    )
                     return None
 
                 threads = self._commands.read_threads(
@@ -361,7 +428,7 @@ class Shell(cmd.Cmd):
                 )
 
                 if not threads:
-                    print_alert("No threads to set", type="warning")
+                    print_alert("No threads available", type="warning")
                     return None
 
                 thread = self._prompts.select_thread(threads)

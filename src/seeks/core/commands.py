@@ -51,6 +51,39 @@ class Commands:
             self._session.rollback()
             raise ValueError("Assistant already exists")
 
+    def create_thread(self, thread: schemas.ThreadCreate) -> schemas.ThreadResponse:
+        """
+        Create thread.
+
+        Params
+        ------
+        - thread (ThreadCreate): Thread to create.
+
+        Returns
+        -------
+        - ThreadResponse: Thread created.
+
+        """
+
+        thread = models.Thread(**thread.model_dump())
+        self._session.add(thread)
+        self._session.commit()
+        return schemas.ThreadResponse.model_validate(thread)
+
+    def create_message(self, message: schemas.MessageCreate) -> None:
+        """
+        Create message.
+
+        Params
+        ------
+        - message (MessageCreate): Message to create.
+
+        """
+
+        message = models.Message(**message.model_dump())
+        self._session.add(message)
+        self._session.commit()
+
     def read_providers(self) -> List[schemas.ProviderResponse]:
         """
         Return all providers.
@@ -78,18 +111,26 @@ class Commands:
         return [schemas.AssistantResponse.model_validate(record) for record in records]
 
     def read_threads(
-        self, assistant_id: Optional[int] = None
-    ) -> List[schemas.ThreadResponse]:
+        self,
+        assistant_id: Optional[int] = None,
+        verbose: Optional[bool] = False,
+    ) -> Union[
+        schemas.ThreadResponse,
+        List[schemas.ThreadResponse],
+        List[schemas.ThreadVerboseResponse],
+    ]:
         """
         Return all threads or return threads filtered by assistant id.
 
         Params
         ------
         - assistant_id (Optional[int]): Assistant id.
+        - verbose (Optional[bool]): Return verbose response.
 
         Returns
         -------
-        - List[ThreadResponse]: Thread(s).
+        - Union[ThreadResponse, List[ThreadResponse],
+          List[ThreadVerboseResponse]]: Thread(s).
 
         """
 
@@ -100,6 +141,13 @@ class Commands:
             return [schemas.ThreadResponse.model_validate(record) for record in records]
 
         records = self._session.scalars(select(models.Thread)).all()
+
+        if verbose:
+            return [
+                schemas.ThreadVerboseResponse.model_validate(record)
+                for record in records
+            ]
+
         return [schemas.ThreadResponse.model_validate(record) for record in records]
 
     def read_settings(
@@ -235,4 +283,18 @@ class Commands:
 
         record = self._session.get(models.Thread, thread_id)
         self._session.delete(record)
+        self._session.commit()
+
+    def delete_thread_setting(self) -> None:
+        """
+        Delete thread settings.
+
+        """
+
+        record = self._session.scalar(select(models.Settings))
+
+        if not record:
+            return None
+
+        record.thread_id = None
         self._session.commit()

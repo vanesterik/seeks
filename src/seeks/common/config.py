@@ -76,13 +76,20 @@ class Config(BaseModel):
                 return provider
         return None
 
-    def list_models(self) -> List[str]:
+    def list_models(self, provider_names: List[str]) -> List[str]:
         """
-        List all models from all provider profiles in flat list.
+        List all models from provider profiles in flat list, filtered by passed
+        provider names.
 
         Returns
         -------
         - List[str]: List of model names.
 
         """
-        return [model.name for provider in self.providers for model in provider.models]
+
+        return [
+            model.name
+            for provider in self.providers
+            if provider.name in provider_names
+            for model in provider.models
+        ]

@@ -1,18 +1,29 @@
+import click
+
 from seeks.common.config import Config
 from seeks.core.commands import Commands
 from seeks.core.database import engine, get_session
 from seeks.core.models import Base
 from seeks.core.prompts import Prompts
 from seeks.core.shell import Shell
+from seeks.utils.clear_screen import clear_screen
 
-# from seeks.utils.clear_screen import clear_screen
 
+@click.command()
+@click.option("--debug", is_flag=True)
+@click.option("--flush", is_flag=True)
+def main(debug: bool = False, flush: bool = False) -> None:
+    # Do not clear screen if in debug mode as it will clear the debugger output
+    if not debug:
+        clear_screen()
 
-def main() -> None:
-    # clear_screen()
+    # Drop all tables if flush flag is set and return to avoid running the
+    # shell. This is useful when developing or testing.
+    if flush:
+        Base.metadata.drop_all(engine)
+        return
 
     # Initialize database and tables
-    # Base.metadata.drop_all(engine)  # Only for developing/testing purposes
     Base.metadata.create_all(bind=engine)
 
     config = Config()

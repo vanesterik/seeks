@@ -4,14 +4,14 @@ from typing import List, Optional, Union
 from pydantic import BaseModel
 
 
-class Component(Enum):
+class Component(str, Enum):
     PROVIDER = "provider"
     ASSISTANT = "assistant"
     THREAD = "thread"
     SETTINGS = "settings"
 
     @classmethod
-    def to_list(cls, exclude: Optional[List["Component"]]) -> List[str]:
+    def to_list(cls, exclude: Optional[List["Component"]] = None) -> List[str]:
         if exclude is None:
             exclude = []
         return [component.value for component in cls if component not in exclude]
@@ -60,9 +60,8 @@ class AssistantResponse(BaseModel):
 
 
 class ThreadBase(BaseModel):
-    name: str
+    subject: str
     assistant_id: int
-    description: str
 
 
 class ThreadCreate(ThreadBase):
@@ -71,9 +70,43 @@ class ThreadCreate(ThreadBase):
 
 class ThreadResponse(BaseModel):
     id: int
-    name: str
     assistant_id: int
-    description: str
+    subject: str
+
+    class Config:
+        from_attributes = True
+
+
+class ThreadVerboseResponse(BaseModel):
+    id: int
+    assistant_name: str
+    subject: str
+
+    class Config:
+        from_attributes = True
+
+
+class Role(str, Enum):
+    SYSTEM = "system"
+    ASSISTANT = "assistant"
+    USER = "user"
+
+
+class MessageBase(BaseModel):
+    thread_id: int
+    role: Role
+    content: str
+
+
+class MessageCreate(MessageBase):
+    pass
+
+
+class MessageResponse(BaseModel):
+    id: int
+    thread_id: int
+    role: Role
+    content: str
 
     class Config:
         from_attributes = True
@@ -91,7 +124,7 @@ class SettingsResponse(BaseModel):
 class SettingsVerboseResponse(BaseModel):
     id: int
     assistant_name: Union[str, None]
-    thread_name: Union[str, None]
+    thread_subject: Union[str, None]
 
     class Config:
         from_attributes = True

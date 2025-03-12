@@ -1,11 +1,10 @@
-from enum import Enum
 from typing import List, Union
 
-from sqlalchemy import Column
-from sqlalchemy import Enum as SQLAlchemyEnum
-from sqlalchemy import ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Column, Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+from seeks.core.schemas import Role
 
 
 class Base(DeclarativeBase):
@@ -53,7 +52,7 @@ class Thread(Base):
     __tablename__ = "thread"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(30))
+    subject: Mapped[str]
     assistant: Mapped["Assistant"] = relationship(back_populates="threads")
     assistant_id: Mapped[int] = mapped_column(ForeignKey("assistant.id"))
     messages: Mapped[List["Message"]] = relationship(
@@ -62,30 +61,28 @@ class Thread(Base):
     )
     settings = relationship("Settings", back_populates="thread")
 
+    @hybrid_property
+    def assistant_name(self) -> Union[str, None]:
+        return self.assistant.name if self.assistant else None
+
     def __repr__(self) -> str:
-        return "<Thread(id={}, name={})>".format(
+        return "<Thread(id={}, subject={})>".format(
             self.id,
-            self.name,
+            self.subject,
         )
-
-
-class RoleType(str, Enum):
-    SYSTEM = "system"
-    ASSISTANT = "assistant"
-    USER = "user"
 
 
 class Message(Base):
     __tablename__ = "message"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    role: Mapped[RoleType] = mapped_column(SQLAlchemyEnum(RoleType))
+    role: Mapped[Role] = mapped_column(Enum(Role))
     content: Mapped[str]
     thread: Mapped["Thread"] = relationship(back_populates="messages")
     thread_id: Mapped[int] = mapped_column(ForeignKey("thread.id"))
 
     def __repr__(self) -> str:
-        return "<Message(id={}, role={}, text={})>".format(
+        return "<Message(id={}, role={}, content={})>".format(
             self.id,
             self.role,
             self.content,
@@ -114,8 +111,8 @@ class Settings(Base):
         return self.assistant.name if self.assistant else None
 
     @hybrid_property
-    def thread_name(self) -> Union[str, None]:
-        return self.thread.name if self.thread else None
+    def thread_subject(self) -> Union[str, None]:
+        return self.thread.subject if self.thread else None
 
     def __repr__(self) -> str:
         return "<Settings(id={}, assistant_id={}, thread_id={})>".format(
