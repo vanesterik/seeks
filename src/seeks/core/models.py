@@ -4,7 +4,7 @@ from sqlalchemy import Column, Enum, ForeignKey, Integer, String, UniqueConstrai
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from seeks.core.schemas import Role
+from seeks.core.schemas import ProviderName, Role
 
 
 class Base(DeclarativeBase):
@@ -15,7 +15,7 @@ class Provider(Base):
     __tablename__ = "provider"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(30), unique=True)
+    name: Mapped[ProviderName] = mapped_column(Enum(ProviderName), unique=True)
     api_key: Mapped[str]
 
     def __repr__(self) -> str:
@@ -32,7 +32,7 @@ class Assistant(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(30), unique=True)
     description: Mapped[str]
-    model: Mapped[str]
+    model_name: Mapped[str]
     threads: Mapped[List["Thread"]] = relationship(
         back_populates="assistant",
         cascade="all, delete-orphan",
@@ -40,10 +40,10 @@ class Assistant(Base):
     settings = relationship("Settings", back_populates="assistant")
 
     def __repr__(self) -> str:
-        return "<Assistant(id={}, name={}, model={}, description={})>".format(
+        return "<Assistant(id={}, name={}, model_name={}, description={})>".format(
             self.id,
             self.name,
-            self.model,
+            self.model_name,
             self.description,
         )
 

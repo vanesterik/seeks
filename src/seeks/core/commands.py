@@ -1,6 +1,6 @@
 from typing import List, Optional, Union
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -70,7 +70,7 @@ class Commands:
         self._session.commit()
         return schemas.ThreadResponse.model_validate(thread)
 
-    def create_message(self, message: schemas.MessageCreate) -> None:
+    def create_message(self, message: schemas.MessageCreate) -> schemas.MessageResponse:
         """
         Create message.
 
@@ -78,11 +78,17 @@ class Commands:
         ------
         - message (MessageCreate): Message to create.
 
+        Returns
+        -------
+        - MessageResponse: Message created.
+
         """
 
         message = models.Message(**message.model_dump())
         self._session.add(message)
         self._session.commit()
+
+        return schemas.MessageResponse.model_validate(message)
 
     def read_providers(self) -> List[schemas.ProviderResponse]:
         """
@@ -97,6 +103,25 @@ class Commands:
         records = self._session.scalars(select(models.Provider)).all()
         return [schemas.ProviderResponse.model_validate(record) for record in records]
 
+    def read_provider_by_name(self, provider_name: str) -> schemas.ProviderResponse:
+        """
+        Return provider by name.
+
+        Params
+        ------
+        - provider_name (str): Provider name.
+
+        Returns
+        -------
+        - ProviderResponse: Provider.
+
+        """
+
+        record = self._session.scalar(
+            select(models.Provider).filter_by(name=provider_name)
+        )
+        return schemas.ProviderResponse.model_validate(record)
+
     def read_assistants(self) -> List[schemas.AssistantResponse]:
         """
         Return all assistants.
@@ -110,12 +135,28 @@ class Commands:
         records = self._session.scalars(select(models.Assistant)).all()
         return [schemas.AssistantResponse.model_validate(record) for record in records]
 
+    def read_assistant_by_id(self, assistant_id: int) -> schemas.AssistantResponse:
+        """
+        Return assistant by id.
+
+        Params
+        ------
+        - assistant_id (int): Assistant id.
+
+        Returns
+        -------
+        - AssistantResponse: Assistant.
+
+        """
+
+        record = self._session.get(models.Assistant, assistant_id)
+        return schemas.AssistantResponse.model_validate(record)
+
     def read_threads(
         self,
         assistant_id: Optional[int] = None,
         verbose: Optional[bool] = False,
     ) -> Union[
-        schemas.ThreadResponse,
         List[schemas.ThreadResponse],
         List[schemas.ThreadVerboseResponse],
     ]:
@@ -129,8 +170,7 @@ class Commands:
 
         Returns
         -------
-        - Union[ThreadResponse, List[ThreadResponse],
-          List[ThreadVerboseResponse]]: Thread(s).
+        - Union[List[ThreadResponse], List[ThreadVerboseResponse]]: Thread(s).
 
         """
 
@@ -149,6 +189,39 @@ class Commands:
             ]
 
         return [schemas.ThreadResponse.model_validate(record) for record in records]
+
+    def read_messages(
+        self,
+        thread_id: int,
+        limit: int = 10,
+    ) -> List[schemas.MessageResponse]:
+        """
+        Return all messages filtered by thread id.
+
+        Params
+        ------
+        - thread_id (int): Thread id.
+        - limit (int): Limit of messages to return.
+
+        Returns
+        -------
+        - List[MessageResponse]: Message(s).
+
+        """
+
+        record_count = (
+            self._session.query(func.count(models.Message.id))
+            .filter_by(thread_id=thread_id)
+            .scalar()
+        )
+        records = self._session.scalars(
+            select(models.Message)
+            .filter_by(thread_id=thread_id)
+            .offset(record_count - limit)
+            .limit(limit)
+        ).all()
+
+        return [schemas.MessageResponse.model_validate(record) for record in records]
 
     def read_settings(
         self,
@@ -211,7 +284,7 @@ class Commands:
 
         record.name = assistant.name
         record.description = assistant.description
-        record.model = assistant.model
+        record.model_name = assistant.model
         self._session.commit()
 
     def update_settings(

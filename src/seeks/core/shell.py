@@ -1,7 +1,11 @@
 import atexit
 import cmd
+import json
 import os
+import re
 import readline
+
+import httpx
 
 from seeks.common.config import Config
 from seeks.core import schemas
@@ -83,7 +87,16 @@ class Shell(cmd.Cmd):
     def default(self, prompt: str) -> None:
         """
         Everything which is not a command, is considered to be input for the
-        configured settings and will be processed accordingly.
+        configured settings and will be processed accordingly. The flow of the
+        application follows these steps:
+
+        1. Check if providers are available.
+        2. Check if assistants are available.
+        3. Check if settings are available.
+        4. Create thread if not available.
+        5. Create message with user input.
+        6. Print user input.
+        7. ...
 
         """
 
@@ -134,6 +147,44 @@ class Shell(cmd.Cmd):
             )
         )
 
+        messages = self._commands.read_messages(thread_id)
+        assistant = self._commands.read_assistant_by_id(settings.assistant_id)
+        provider_profile = self._config.find_provider_by_model(assistant.model_name)
+        provider = self._commands.read_provider_by_name(provider_profile.name)
+
+        headers, data = self._config.generate_payload(
+            provider=provider,
+            assistant=assistant,
+            messages=messages,
+        )
+
+        # Todo: Abstract this to a separate function in order to choose between:
+        # - httpx vs requests
+        # - different providers/models (ie. GPT-4, Claude, etc.)
+        # - apply pydantic validation on response
+
+        with httpx.stream(
+            "POST",
+            provider_profile.endpoint,
+            headers=headers,
+            json=data,
+        ) as response:
+            for line in response.iter_lines():
+
+                if not re.search(r"\{.*\}", line):
+                    continue
+
+                data = json.loads(line[len("data: ") :])
+                content = data["choices"][0]["delta"].get("content", "")
+
+                print(
+                    content,
+                    end="",
+                    flush=True,
+                )
+
+            print("\n")
+
     def do_quit(self, _: str) -> bool:
         """
         Quit the program
@@ -172,9 +223,9 @@ class Shell(cmd.Cmd):
                 return None
 
             providers = [
-                schemas.ProviderResponse(
+                schemas.ProviderVerboseResponse(
                     id=provider.id,
-                    name=self._config.find_provider(provider.name).display_name,
+                    name=self._config.find_provider_by_name(provider.name).display_name,
                     api_key=mask_api_key(provider.api_key),
                 )
                 for provider in providers
@@ -192,7 +243,7 @@ class Shell(cmd.Cmd):
                 schemas.AssistantResponse(
                     id=assistant.id,
                     name=assistant.name,
-                    model=assistant.model,
+                    model_name=assistant.model_name,
                     description=ellipse(assistant.description),
                 )
                 for assistant in assistants

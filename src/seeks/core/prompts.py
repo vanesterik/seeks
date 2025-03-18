@@ -71,7 +71,7 @@ class Prompts:
 
         choices = [
             Choice(
-                title=self._config.find_provider(provider.name).display_name,
+                title=self._config.find_provider_by_name(provider.name).display_name,
                 value=provider.id,
             )
             for provider in providers
@@ -233,8 +233,8 @@ class Prompts:
             },
             {
                 "type": "select",
-                "name": "model",
-                "message": "Model",
+                "name": "model_name",
+                "message": "Model name",
                 "choices": self._config.list_models(provider_names),
             },
             {
@@ -309,7 +309,7 @@ class Prompts:
                 "name": "model",
                 "message": "Model",
                 "choices": self._config.list_models(provider_names),
-                "default": assistant.model,
+                "default": assistant.model_name,
             },
             {
                 "type": "text",

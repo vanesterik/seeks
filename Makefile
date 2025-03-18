@@ -72,9 +72,9 @@ dev:
 		--recursive \
 		-- pdm run ./${PACKAGE}/main.py --debug
 
-## Run main script but flush database and reseed
-flush:
-	pdm run ./${PACKAGE}/main.py --flush
+## Run reset script in order to start from scratch with some initial data
+reset:
+	pdm run ./${PACKAGE}/reset.py
 
 ################################################################################
 # Self Documenting Commands                                                    #

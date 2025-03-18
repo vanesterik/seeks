@@ -38,6 +38,25 @@ def print_alert(
     print(f"[{prefix[type]}] {message}\n")
 
 
+def print_message(
+    content: str,
+    style: Literal[
+        "bold",
+        "italic",
+        "normal",
+    ] = "bold",
+) -> None:
+
+    if style == "italic":
+        print(f"\n\033[3m{content}\033[0m\n")
+
+    if style == "bold":
+        print(f"\n\033[1m{content}\033[0m\n")
+
+    if style == "normal":
+        print(f"\n{content}\n")
+
+
 def print_table(
     data: Union[
         List[schemas.ProviderResponse],

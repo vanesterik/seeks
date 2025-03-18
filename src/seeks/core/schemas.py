@@ -21,8 +21,20 @@ class ComponentSelect(BaseModel):
     component: Component
 
 
+class ProviderName(str, Enum):
+    ANTHROPIC = "anthropic"
+    OPENAI = "openai"
+
+
+class ModelName(str, Enum):
+    CLAUDE_3_5_HAIKU_20241022 = "claude-3-5-haiku-20241022"
+    CLAUDE_3_5_SONNET_20241022 = "claude-3-5-sonnet-20241022"
+    O3_MINI = "o3-mini"
+    GPT_4O = "gpt-4o"
+
+
 class ProviderBase(BaseModel):
-    name: str
+    name: ProviderName
     api_key: str
 
 
@@ -30,7 +42,14 @@ class ProviderCreate(ProviderBase):
     pass
 
 
-class ProviderResponse(BaseModel):
+class ProviderResponse(ProviderBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+class ProviderVerboseResponse(BaseModel):
     id: int
     name: str
     api_key: str
@@ -41,7 +60,7 @@ class ProviderResponse(BaseModel):
 
 class AssistantBase(BaseModel):
     name: str
-    model: str
+    model_name: str
     description: str
 
 
@@ -49,11 +68,8 @@ class AssistantCreate(AssistantBase):
     pass
 
 
-class AssistantResponse(BaseModel):
+class AssistantResponse(AssistantBase):
     id: int
-    name: str
-    model: str
-    description: str
 
     class Config:
         from_attributes = True
@@ -68,10 +84,8 @@ class ThreadCreate(ThreadBase):
     pass
 
 
-class ThreadResponse(BaseModel):
+class ThreadResponse(ThreadBase):
     id: int
-    assistant_id: int
-    subject: str
 
     class Config:
         from_attributes = True
@@ -102,11 +116,8 @@ class MessageCreate(MessageBase):
     pass
 
 
-class MessageResponse(BaseModel):
+class MessageResponse(MessageBase):
     id: int
-    thread_id: int
-    role: Role
-    content: str
 
     class Config:
         from_attributes = True
